@@ -37,11 +37,11 @@ The application provides a user-friendly interface to browse both a remote Revit
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/BTankut/Revit_To_Navisworks.git
+    git clone https://github.com/BTankut/Revit-Navisworks_Converter.git
     ```
 2.  Navigate to the project directory:
     ```bash
-    cd Revit_To_Navisworks/RvtToNavisConverter
+    cd Revit-Navisworks_Converter
     ```
 3.  Build the project using Visual Studio or the .NET CLI:
     ```bash
