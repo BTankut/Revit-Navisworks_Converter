@@ -10,8 +10,27 @@ namespace RvtToNavisConverter.Models
         public bool IsDirectory => false;
 
         // Additional properties specific to files
-        public bool IsSelectedForDownload { get; set; }
-        public bool IsSelectedForConversion { get; set; }
+        private bool _isSelectedForDownload;
+        public bool IsSelectedForDownload
+        {
+            get => _isSelectedForDownload;
+            set
+            {
+                _isSelectedForDownload = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private bool _isSelectedForConversion;
+        public bool IsSelectedForConversion
+        {
+            get => _isSelectedForConversion;
+            set
+            {
+                _isSelectedForConversion = value;
+                OnPropertyChanged();
+            }
+        }
         public bool IsLocal { get; set; }
 
         private string _status = "Pending";

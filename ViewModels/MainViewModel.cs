@@ -65,8 +65,10 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand OpenSettingsCommand { get; }
         public ICommand OpenMonitorCommand { get; }
         public ICommand CancelCommand { get; }
+        public ICommand ClearAllSelectionsCommand { get; }
 
         private CancellationTokenSource? _cancellationTokenSource;
+        private readonly Dictionary<string, IFileSystemItem> _selectedItems = new Dictionary<string, IFileSystemItem>();
 
         public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper)
         {
@@ -92,6 +94,17 @@ namespace RvtToNavisConverter.ViewModels
             OpenSettingsCommand = new RelayCommand(_ => OpenSettings(), _ => !IsLoading);
             OpenMonitorCommand = new RelayCommand(_ => OpenMonitor(), _ => !IsLoading);
             CancelCommand = new RelayCommand(_ => CancelOperation(), _ => IsLoading);
+            ClearAllSelectionsCommand = new RelayCommand(_ => ClearAllSelections(), _ => !IsLoading);
+        }
+
+        private void ClearAllSelections()
+        {
+            _selectedItems.Clear();
+            foreach (var item in FileSystemItems)
+            {
+                item.IsSelectedForDownload = false;
+                item.IsSelectedForConversion = false;
+            }
         }
 
         private void OpenSettings()
@@ -145,6 +158,19 @@ namespace RvtToNavisConverter.ViewModels
         {
             if (string.IsNullOrEmpty(path)) return;
 
+            // Save current selections
+            foreach (var item in FileSystemItems)
+            {
+                if (item.IsSelectedForDownload || item.IsSelectedForConversion)
+                {
+                    _selectedItems[item.Path] = item;
+                }
+                else
+                {
+                    _selectedItems.Remove(item.Path);
+                }
+            }
+
             IsLoading = true;
             StatusMessage = $"Loading contents of {path}...";
             _cancellationTokenSource = new CancellationTokenSource();
@@ -159,6 +185,16 @@ namespace RvtToNavisConverter.ViewModels
                 else
                 {
                     items = await Task.Run(() => _revitServerService.GetDirectoryContentsAsync(path, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
+                }
+
+                // Restore selections
+                foreach (var item in items)
+                {
+                    if (_selectedItems.TryGetValue(item.Path, out var selectedItem))
+                    {
+                        item.IsSelectedForDownload = selectedItem.IsSelectedForDownload;
+                        item.IsSelectedForConversion = selectedItem.IsSelectedForConversion;
+                    }
                 }
 
                 FileSystemItems = new ObservableCollection<IFileSystemItem>(items);
@@ -195,10 +231,23 @@ namespace RvtToNavisConverter.ViewModels
 
         private async Task ProcessFilesAsync()
         {
+            // Save current selections before processing
+            foreach (var item in FileSystemItems)
+            {
+                if (item.IsSelectedForDownload || item.IsSelectedForConversion)
+                {
+                    _selectedItems[item.Path] = item;
+                }
+                else
+                {
+                    _selectedItems.Remove(item.Path);
+                }
+            }
+
             var filesToDownload = new List<FileItem>();
             var filesToConvert = new List<FileItem>();
 
-            foreach (var item in FileSystemItems)
+            foreach (var item in _selectedItems.Values)
             {
                 if (item is FolderItem folder && (folder.IsSelectedForDownload || folder.IsSelectedForConversion))
                 {
@@ -326,19 +375,28 @@ namespace RvtToNavisConverter.ViewModels
             }
             catch (OperationCanceledException)
             {
-                _progressViewModel.AddLog("Operation was cancelled.");
+                if (_progressViewModel != null)
+                {
+                    _progressViewModel.AddLog("Operation was cancelled.");
+                }
                 StatusMessage = "Processing cancelled.";
             }
             catch (Exception ex)
             {
-                _progressViewModel.AddLog($"FATAL ERROR: {ex.Message}");
+                if (_progressViewModel != null)
+                {
+                    _progressViewModel.AddLog($"FATAL ERROR: {ex.Message}");
+                }
                 MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
                 IsLoading = false;
-                _cancellationTokenSource.Dispose();
-                _cancellationTokenSource = null;
+                if (_cancellationTokenSource != null)
+                {
+                    _cancellationTokenSource.Dispose();
+                    _cancellationTokenSource = null;
+                }
                 // progressWindow.Close(); // Optional: close window when done
             }
         }

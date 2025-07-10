@@ -47,6 +47,9 @@
                 <materialDesign:PackIcon Kind="Monitor" />
             </Button>
             <Separator/>
+            <Button Command="{Binding ClearAllSelectionsCommand}" ToolTip="Clear All Selections">
+                <materialDesign:PackIcon Kind="DeleteSweep" />
+            </Button>
             <Button Command="{Binding CancelCommand}" Content="Cancel" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Background="IndianRed"/>
         </ToolBar>
 
