@@ -1,0 +1,170 @@
+<Window x:Class="RvtToNavisConverter.Views.SettingsView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:RvtToNavisConverter.Views"
+        xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+        mc:Ignorable="d"
+        Title="Settings" Height="550" Width="800">
+    <Window.Resources>
+        <helpers:ValidationStatusToIconConverter x:Key="ValidationStatusToIconConverter"/>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Revit Server IP -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Revit Server IP"
+                                 Text="{Binding AppSettings.RevitServerIp, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 Margin="0,5">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="LostFocus">
+                                    <i:InvokeCommandAction Command="{Binding ValidateRevitServerIpCommand}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </TextBox>
+                        <TextBox Text="Example: 192.168.200.115" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
+                    </StackPanel>
+                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding RevitServerIpStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                                             VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+
+                <!-- Revit Server Accelerator -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Revit Server Accelerator IP"
+                                 Text="{Binding AppSettings.RevitServerAccelerator, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 Margin="0,5">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="LostFocus">
+                                    <i:InvokeCommandAction Command="{Binding ValidateRevitServerAcceleratorCommand}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </TextBox>
+                        <TextBox Text="Example: 192.168.90.197 or WIN-HAJNJL8PG9R" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
+                    </StackPanel>
+                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding RevitServerAcceleratorStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                                             VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+
+                <!-- Revit Tool Path -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Revit Tool Path"
+                                 Text="{Binding AppSettings.RevitServerToolPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 Margin="0,5">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="LostFocus">
+                                    <i:InvokeCommandAction Command="{Binding ValidateRevitToolPathCommand}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </TextBox>
+                        <TextBox Text="Example: C:\Program Files\Autodesk\Revit Server 2021\Tools\RevitServerToolCommand\RevitServerTool.exe" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
+                    </StackPanel>
+                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding RevitToolPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                                             VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+
+                <!-- Navisworks Tool Path -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Navisworks Tool Path"
+                                 Text="{Binding AppSettings.NavisworksToolPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 Margin="0,5">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="LostFocus">
+                                    <i:InvokeCommandAction Command="{Binding ValidateNavisworksToolPathCommand}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </TextBox>
+                        <TextBox Text="Example: C:\Program Files\Autodesk\Navisworks Manage 2022\FileToolsTaskRunner.exe" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
+                    </StackPanel>
+                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding NavisworksToolPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                                             VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+
+                <!-- Default Download Path -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Default Download Path"
+                                 Text="{Binding AppSettings.DefaultDownloadPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 Margin="0,5">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="LostFocus">
+                                    <i:InvokeCommandAction Command="{Binding ValidateDefaultDownloadPathCommand}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </TextBox>
+                        <TextBox Text="Example: C:\Users\Administrator\Documents\RvtToNavisExports\RVT" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
+                    </StackPanel>
+                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding DefaultDownloadPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                                             VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+
+
+                <!-- Default NWD Path -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Default NWD Path"
+                                 Text="{Binding AppSettings.DefaultNwdPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 Margin="0,5">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="LostFocus">
+                                    <i:InvokeCommandAction Command="{Binding ValidateDefaultNwdPathCommand}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </TextBox>
+                        <TextBox Text="Example: C:\Users\Administrator\Documents\RvtToNavisExports\NWD" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
+                    </StackPanel>
+                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding DefaultNwdPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                                             VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Validate All" Command="{Binding ValidateAllCommand}" Margin="5"/>
+            <Button Content="Save" Command="{Binding SaveCommand}" Margin="5" IsDefault="True"/>
+            <Button Content="Reload" Command="{Binding LoadCommand}" Margin="5"/>
+        </StackPanel>
+    </Grid>
+</Window>

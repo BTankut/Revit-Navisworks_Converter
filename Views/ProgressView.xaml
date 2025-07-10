@@ -1,0 +1,27 @@
+<Window x:Class="RvtToNavisConverter.Views.ProgressView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:RvtToNavisConverter.Views"
+        xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
+        mc:Ignorable="d"
+        Title="Processing..." Height="450" Width="600" WindowStartupLocation="CenterOwner">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{Binding CurrentAction}" FontWeight="Bold" Margin="0,0,0,5"/>
+        
+        <ProgressBar Grid.Row="1" Value="{Binding ProgressPercentage}" Minimum="0" Maximum="100" Height="20"/>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+            <TextBox Text="{Binding LogMessages, Mode=OneWay}" 
+                     IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"/>
+        </ScrollViewer>
+    </Grid>
+</Window>
