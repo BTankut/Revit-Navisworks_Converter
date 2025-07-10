@@ -88,7 +88,7 @@ namespace RvtToNavisConverter.ViewModels
             BrowseLocalCommand = new RelayCommand(async _ => await BrowseLocalAsync(), _ => !IsLoading);
             GoUpCommand = new RelayCommand(async _ => await GoUpAsync(), _ => !IsLoading && !string.IsNullOrEmpty(CurrentPath) && IsNotInRoot(CurrentPath));
             NavigateToFolderCommand = new RelayCommand(async item => await NavigateToPathAsync((item as IFileSystemItem)?.Path, FileSystemItems.OfType<FileItem>().Any(f => f.IsLocal)), item => item is IFileSystemItem fsItem && fsItem.IsDirectory && !IsLoading);
-            StartProcessingCommand = new RelayCommand(async _ => await ProcessFilesAsync(), _ => FileSystemItems.OfType<FileItem>().Any(f => f.IsSelectedForDownload || f.IsSelectedForConversion) && !IsLoading);
+            StartProcessingCommand = new RelayCommand(async _ => await ProcessFilesAsync(), _ => FileSystemItems.Any(f => f.IsSelectedForDownload || f.IsSelectedForConversion) && !IsLoading);
             OpenSettingsCommand = new RelayCommand(_ => OpenSettings(), _ => !IsLoading);
             OpenMonitorCommand = new RelayCommand(_ => OpenMonitor(), _ => !IsLoading);
             CancelCommand = new RelayCommand(_ => CancelOperation(), _ => IsLoading);
@@ -195,8 +195,36 @@ namespace RvtToNavisConverter.ViewModels
 
         private async Task ProcessFilesAsync()
         {
-            var filesToDownload = FileSystemItems.OfType<FileItem>().Where(f => f.IsSelectedForDownload).ToList();
-            var filesToConvert = FileSystemItems.OfType<FileItem>().Where(f => f.IsSelectedForConversion).ToList();
+            var filesToDownload = new List<FileItem>();
+            var filesToConvert = new List<FileItem>();
+
+            foreach (var item in FileSystemItems)
+            {
+                if (item is FolderItem folder && (folder.IsSelectedForDownload || folder.IsSelectedForConversion))
+                {
+                    var allFiles = await GetAllFilesRecursive(folder.Path, item.IsLocal);
+                    if (folder.IsSelectedForDownload)
+                    {
+                        filesToDownload.AddRange(allFiles);
+                    }
+                    if (folder.IsSelectedForConversion)
+                    {
+                        filesToConvert.AddRange(allFiles);
+                    }
+                }
+                else if (item is FileItem file)
+                {
+                    if (file.IsSelectedForDownload)
+                    {
+                        filesToDownload.Add(file);
+                    }
+                    if (file.IsSelectedForConversion)
+                    {
+                        filesToConvert.Add(file);
+                    }
+                }
+            }
+
             var filesToProcess = filesToDownload.Union(filesToConvert).Distinct().ToList();
 
             if (!filesToProcess.Any())
@@ -319,6 +347,27 @@ namespace RvtToNavisConverter.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() => file.Status = status);
             _fileStatusService.SetStatus(file.Path, status);
+        }
+
+        private async Task<List<FileItem>> GetAllFilesRecursive(string path, bool isLocal)
+        {
+            var allFiles = new List<FileItem>();
+            var items = isLocal 
+                ? await _localFileService.GetDirectoryContentsAsync(path, CancellationToken.None)
+                : await _revitServerService.GetDirectoryContentsAsync(path, CancellationToken.None);
+
+            foreach (var item in items)
+            {
+                if (item is FileItem file)
+                {
+                    allFiles.Add(file);
+                }
+                else if (item is FolderItem folder)
+                {
+                    allFiles.AddRange(await GetAllFilesRecursive(folder.Path, isLocal));
+                }
+            }
+            return allFiles;
         }
     }
 }

@@ -73,8 +73,7 @@
                     <GridViewColumn Header="C" Width="30">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <CheckBox IsEnabled="{Binding IsDirectory, Converter={StaticResource BooleanToNegativeVisibilityConverter}}" 
-                                          IsChecked="{Binding IsSelectedForConversion}" 
+                                <CheckBox IsChecked="{Binding IsSelectedForConversion}" 
                                           HorizontalAlignment="Center" 
                                           ToolTip="Convert" />
                             </DataTemplate>
