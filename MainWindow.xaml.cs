@@ -1,6 +1,7 @@
 using RvtToNavisConverter.Models;
 using RvtToNavisConverter.ViewModels;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace RvtToNavisConverter
@@ -23,6 +24,50 @@ namespace RvtToNavisConverter
                     {
                         vm.NavigateToFolderCommand.Execute(item);
                     }
+                }
+            }
+        }
+
+        private void DownloadCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox checkBox && checkBox.DataContext is IFileSystemItem item)
+            {
+                if (DataContext is MainViewModel vm)
+                {
+                    // Sadece true/false arasında geçiş yap, indeterminate durumunu kullanıcı seçemesin
+                    bool? currentValue = item.IsSelectedForDownload;
+                    bool? newValue;
+                    
+                    // Eğer null (indeterminate) ise veya false ise, true yap
+                    if (currentValue != true)
+                        newValue = true;
+                    else
+                        newValue = false;
+                    
+                    // SelectionManager'a bildir (UI güncellemesi otomatik olacak)
+                    vm.HandleSelectionChange(item, true, newValue);
+                }
+            }
+        }
+
+        private void ConversionCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox checkBox && checkBox.DataContext is IFileSystemItem item)
+            {
+                if (DataContext is MainViewModel vm)
+                {
+                    // Sadece true/false arasında geçiş yap, indeterminate durumunu kullanıcı seçemesin
+                    bool? currentValue = item.IsSelectedForConversion;
+                    bool? newValue;
+                    
+                    // Eğer null (indeterminate) ise veya false ise, true yap
+                    if (currentValue != true)
+                        newValue = true;
+                    else
+                        newValue = false;
+                    
+                    // SelectionManager'a bildir (UI güncellemesi otomatik olacak)
+                    vm.HandleSelectionChange(item, false, newValue);
                 }
             }
         }

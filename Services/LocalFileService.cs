@@ -38,7 +38,7 @@ namespace RvtToNavisConverter.Services
                         Name = file.Name,
                         Path = file.FullName,
                         IsLocal = true,
-                        IsSelectedForDownload = false // Cannot be downloaded
+                        // IsSelectedForDownload = null by default (Cannot be downloaded)
                     });
                 }
                 return items.OrderBy(i => i.IsDirectory ? 0 : 1).ThenBy(i => i.Name);

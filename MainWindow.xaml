@@ -67,18 +67,22 @@
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <CheckBox IsEnabled="{Binding IsLocal, Converter={StaticResource BooleanToNegativeVisibilityConverter}}" 
-                                          IsChecked="{Binding IsSelectedForDownload}" 
+                                          IsChecked="{Binding IsSelectedForDownload, Mode=OneWay}" 
+                                          IsThreeState="True"
                                           HorizontalAlignment="Center" 
-                                          ToolTip="Download" />
+                                          ToolTip="Download"
+                                          Click="DownloadCheckBox_Click" />
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
                     <GridViewColumn Header="C" Width="30">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsSelectedForConversion}" 
+                                <CheckBox IsChecked="{Binding IsSelectedForConversion, Mode=OneWay}" 
+                                          IsThreeState="True"
                                           HorizontalAlignment="Center" 
-                                          ToolTip="Convert" />
+                                          ToolTip="Convert"
+                                          Click="ConversionCheckBox_Click" />
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>

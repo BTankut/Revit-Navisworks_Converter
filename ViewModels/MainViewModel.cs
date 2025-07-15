@@ -27,6 +27,7 @@ namespace RvtToNavisConverter.ViewModels
         private readonly ProgressViewModel _progressViewModel;
         private readonly MonitorViewModel _monitorViewModel;
         private readonly IServiceProvider _serviceProvider;
+        private readonly SelectionManager _selectionManager;
         private ProgressView? _progressWindow;
 
         private ObservableCollection<IFileSystemItem> _fileSystemItems = new ObservableCollection<IFileSystemItem>();
@@ -66,11 +67,13 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand OpenMonitorCommand { get; }
         public ICommand CancelCommand { get; }
         public ICommand ClearAllSelectionsCommand { get; }
+        public ICommand ToggleDownloadCommand { get; }
+        public ICommand ToggleConversionCommand { get; }
 
         private CancellationTokenSource? _cancellationTokenSource;
         private readonly Dictionary<string, IFileSystemItem> _selectedItems = new Dictionary<string, IFileSystemItem>();
 
-        public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper)
+        public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper, SelectionManager selectionManager)
         {
             _serviceProvider = serviceProvider;
             _settingsService = settingsService;
@@ -82,6 +85,9 @@ namespace RvtToNavisConverter.ViewModels
             _settingsViewModel = settingsViewModel;
             _progressViewModel = progressViewModel;
             _monitorViewModel = monitorViewModel;
+            
+            _selectionManager = selectionManager;
+            _selectionManager.SelectionChanged += SelectionManager_SelectionChanged;
 
             // Subscribe to the PowerShell log event
             powerShellHelper.CommandLog += _monitorViewModel.AddLogEntry;
@@ -89,22 +95,210 @@ namespace RvtToNavisConverter.ViewModels
             ConnectCommand = new RelayCommand(async _ => await ConnectToServerAsync(), _ => !IsLoading);
             BrowseLocalCommand = new RelayCommand(async _ => await BrowseLocalAsync(), _ => !IsLoading);
             GoUpCommand = new RelayCommand(async _ => await GoUpAsync(), _ => !IsLoading && !string.IsNullOrEmpty(CurrentPath) && IsNotInRoot(CurrentPath));
-            NavigateToFolderCommand = new RelayCommand(async item => await NavigateToPathAsync((item as IFileSystemItem)?.Path, FileSystemItems.OfType<FileItem>().Any(f => f.IsLocal)), item => item is IFileSystemItem fsItem && fsItem.IsDirectory && !IsLoading);
-            StartProcessingCommand = new RelayCommand(async _ => await ProcessFilesAsync(), _ => FileSystemItems.Any(f => f.IsSelectedForDownload || f.IsSelectedForConversion) && !IsLoading);
+NavigateToFolderCommand = new RelayCommand(
+    async (object? item) => 
+    {
+        var fileSystemItem = item as IFileSystemItem;
+        if (fileSystemItem != null && fileSystemItem.IsDirectory)
+        {
+            await NavigateToPathAsync(fileSystemItem.Path, FileSystemItems.OfType<FileItem>().Any(f => f.IsLocal));
+        }
+    }, 
+    item => item is IFileSystemItem fsItem && fsItem.IsDirectory && !IsLoading
+);
+StartProcessingCommand = new RelayCommand(
+    async _ => await ProcessFilesAsync(), 
+    _ => FileSystemItems.Any(f => 
+        (f.IsSelectedForDownload ?? false) || 
+        (f.IsSelectedForConversion ?? false)
+    ) && !IsLoading
+);
             OpenSettingsCommand = new RelayCommand(_ => OpenSettings(), _ => !IsLoading);
             OpenMonitorCommand = new RelayCommand(_ => OpenMonitor(), _ => !IsLoading);
             CancelCommand = new RelayCommand(_ => CancelOperation(), _ => IsLoading);
             ClearAllSelectionsCommand = new RelayCommand(_ => ClearAllSelections(), _ => !IsLoading);
+ToggleDownloadCommand = new RelayCommand(
+    item => 
+    {
+        var fileSystemItem = item as IFileSystemItem;
+        if (fileSystemItem != null)
+        {
+            ToggleSelection(fileSystemItem, true);
+        }
+    }, 
+    _ => !IsLoading);
+            ToggleConversionCommand = new RelayCommand(
+    item => 
+    {
+        var fileSystemItem = item as IFileSystemItem;
+        if (fileSystemItem != null)
+        {
+            ToggleSelection(fileSystemItem, false);
+        }
+    }, 
+    _ => !IsLoading);
+        }
+
+        private void SelectionManager_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            // When selection changes in SelectionManager, update UI
+            if (e.Path == "*") // Special case for ClearAllSelections
+            {
+                foreach (var fileSystemItem in FileSystemItems)
+                {
+                    if (e.IsDownload)
+                        fileSystemItem.IsSelectedForDownload = false;
+                    else
+                        fileSystemItem.IsSelectedForConversion = false;
+                }
+                return;
+            }
+
+            // Eğer bu bir marker ise (klasör işaretleyicisi), UI'da gösterilmez ama alt öğeleri güncelle
+            if (e.IsMarker)
+            {
+                FileLogger.Log($"Marker değişikliği: {e.Path}, IsDownload: {e.IsDownload}, Value: {e.Value}");
+                
+                // Marker'ın klasör yolunu al
+                string folderPath = e.Path.Substring(0, e.Path.Length - 2); // "\*" kısmını çıkar
+                
+                FileLogger.Log($"  Marker klasör yolu: {folderPath}");
+                FileLogger.Log($"  Mevcut UI öğe sayısı: {FileSystemItems.Count}");
+                
+                // Bu klasörün altındaki tüm UI öğelerini güncelle
+                foreach (var uiItem in FileSystemItems)
+                {
+                    bool shouldUpdate = false;
+                    
+                    // Klasörün kendisi mi?
+                    if (uiItem.Path.Equals(folderPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        shouldUpdate = true;
+                        FileLogger.Log($"  Klasörün kendisi bulundu: {uiItem.Path}");
+                    }
+                    // Alt öğesi mi? (klasör yolu ile başlıyor ve daha uzun)
+                    else if (uiItem.Path.StartsWith(folderPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Tam olarak alt öğe olduğundan emin ol (sadece prefix değil)
+                        string remainingPath = uiItem.Path.Substring(folderPath.Length);
+                        if (remainingPath.StartsWith("\\") || remainingPath.StartsWith("/"))
+                        {
+                            shouldUpdate = true;
+                            FileLogger.Log($"  Alt öğe bulundu: {uiItem.Path}");
+                        }
+                    }
+                    
+                    if (shouldUpdate)
+                    {
+                        FileLogger.Log($"  Marker nedeniyle UI öğesi güncelleniyor: {uiItem.Path}, Value: {e.Value}");
+                        
+                        if (e.IsDownload)
+                        {
+                            uiItem.IsSelectedForDownload = e.Value;
+                            
+                            // Tri-state durumunu da güncelle
+                            if (uiItem is FolderItem folder)
+                            {
+                                folder.IsPartiallySelectedForDownload = false;
+                            }
+                        }
+                        else
+                        {
+                            uiItem.IsSelectedForConversion = e.Value;
+                            
+                            // Tri-state durumunu da güncelle
+                            if (uiItem is FolderItem folder)
+                            {
+                                folder.IsPartiallySelectedForConversion = false;
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            var item = FileSystemItems.FirstOrDefault(i => i.Path.Equals(e.Path, StringComparison.OrdinalIgnoreCase));
+            if (item != null)
+            {
+                FileLogger.Log($"UI güncelleniyor: {e.Path}, IsDownload: {e.IsDownload}, Value: {e.Value}");
+                
+                // UI'daki değeri güncelle
+                if (e.IsDownload)
+                {
+                    item.IsSelectedForDownload = e.Value;
+                    
+                    // Eğer bu bir klasör ise ve tri-state özellikler varsa güncelle
+                    if (item is FolderItem folder)
+                    {
+                        folder.IsPartiallySelectedForDownload = e.Value == null;
+                    }
+                }
+                else
+                {
+                    item.IsSelectedForConversion = e.Value;
+                    
+                    // Eğer bu bir klasör ise ve tri-state özellikler varsa güncelle
+                    if (item is FolderItem folder)
+                    {
+                        folder.IsPartiallySelectedForConversion = e.Value == null;
+                    }
+                }
+            }
+            else
+            {
+                FileLogger.Log($"UI öğesi bulunamadı: {e.Path}");
+            }
+        }
+
+        public void HandleSelectionChange(IFileSystemItem item, bool isDownload, bool? newValue)
+        {
+            if (item == null) return;
+
+            if (item.IsDirectory)
+            {
+                // Klasör için recursive işlem yap
+                if (newValue.HasValue)
+                {
+                    _selectionManager.SelectFolderRecursively(item.Path, isDownload, newValue.Value);
+                }
+                else
+                {
+                    // Null değer için klasörü indeterminate duruma getir
+                    _selectionManager.SetSelection(item.Path, isDownload, null);
+                }
+            }
+            else
+            {
+                // Dosya için sadece kendi seçimini ayarla
+                _selectionManager.SetSelection(item.Path, isDownload, newValue);
+            }
+            
+            // Her durumda üst klasörlerin durumunu güncelle - mevcut UI öğelerini de geç
+            _selectionManager.UpdateParentStates(item.Path, isDownload, FileSystemItems);
+        }
+
+private void ToggleSelection(IFileSystemItem item, bool isDownload)
+        {
+            if (item == null) return;
+
+            bool? currentValue = isDownload ? item.IsSelectedForDownload : item.IsSelectedForConversion;
+            bool? newValue;
+
+            // Implement three-state toggle: null -> false -> true -> null
+            if (currentValue == null)
+                newValue = false;
+            else if (currentValue == false)
+                newValue = true;
+            else
+                newValue = null;
+
+            HandleSelectionChange(item, isDownload, newValue);
         }
 
         private void ClearAllSelections()
         {
+            _selectionManager.ClearAllSelections();
             _selectedItems.Clear();
-            foreach (var item in FileSystemItems)
-            {
-                item.IsSelectedForDownload = false;
-                item.IsSelectedForConversion = false;
-            }
         }
 
         private void OpenSettings()
@@ -159,17 +353,7 @@ namespace RvtToNavisConverter.ViewModels
             if (string.IsNullOrEmpty(path)) return;
 
             // Save current selections
-            foreach (var item in FileSystemItems)
-            {
-                if (item.IsSelectedForDownload || item.IsSelectedForConversion)
-                {
-                    _selectedItems[item.Path] = item;
-                }
-                else
-                {
-                    _selectedItems.Remove(item.Path);
-                }
-            }
+            SaveCurrentSelections();
 
             IsLoading = true;
             StatusMessage = $"Loading contents of {path}...";
@@ -187,15 +371,11 @@ namespace RvtToNavisConverter.ViewModels
                     items = await Task.Run(() => _revitServerService.GetDirectoryContentsAsync(path, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
                 }
 
-                // Restore selections
-                foreach (var item in items)
-                {
-                    if (_selectedItems.TryGetValue(item.Path, out var selectedItem))
-                    {
-                        item.IsSelectedForDownload = selectedItem.IsSelectedForDownload;
-                        item.IsSelectedForConversion = selectedItem.IsSelectedForConversion;
-                    }
-                }
+            // Restore selections only if there are any saved selections
+            if (_selectedItems.Count > 0 || _selectionManager.GetAllSelections().Count > 0)
+            {
+                RestoreSelections(items);
+            }
 
                 FileSystemItems = new ObservableCollection<IFileSystemItem>(items);
                 CurrentPath = path;
@@ -218,6 +398,67 @@ namespace RvtToNavisConverter.ViewModels
             }
         }
 
+        private void SaveCurrentSelections()
+        {
+            // Mevcut tüm seçimleri kaydet - sadece gerçekten seçili olanları
+            foreach (var item in FileSystemItems)
+            {
+                // Sadece seçili öğeleri kaydet
+                if (item.IsSelectedForDownload == true || item.IsSelectedForConversion == true)
+                {
+                    _selectedItems[item.Path] = item;
+                }
+                else
+                {
+                    // Seçili değilse dictionary'den kaldır
+                    _selectedItems.Remove(item.Path);
+                }
+            }
+            
+            // Ayrıca SelectionManager'daki tüm seçimleri de kaydet
+            var allSelections = _selectionManager.GetAllSelections();
+            FileLogger.Log($"SaveCurrentSelections: {allSelections.Count} seçim kaydedildi, _selectedItems: {_selectedItems.Count}");
+        }
+
+        private void RestoreSelections(IEnumerable<IFileSystemItem> items)
+        {
+            FileLogger.Log($"RestoreSelections başlıyor, öğe sayısı: {items.Count()}");
+            
+            // Önce SelectionManager'dan seçim durumlarını al
+            foreach (var item in items)
+            {
+                // SelectionManager'dan seçim durumunu kontrol et
+                var downloadSelection = _selectionManager.GetSelection(item.Path, true);
+                var conversionSelection = _selectionManager.GetSelection(item.Path, false);
+                
+                FileLogger.Log($"  Öğe: {item.Path}, Download: {downloadSelection}, Conversion: {conversionSelection}");
+                
+                if (downloadSelection.HasValue)
+                {
+                    item.IsSelectedForDownload = downloadSelection;
+                    
+                    // Tri-state durumunu güncelle
+                    if (item is FolderItem folder)
+                    {
+                        folder.IsPartiallySelectedForDownload = downloadSelection == null;
+                    }
+                }
+                
+                if (conversionSelection.HasValue)
+                {
+                    item.IsSelectedForConversion = conversionSelection;
+                    
+                    // Tri-state durumunu güncelle
+                    if (item is FolderItem folder)
+                    {
+                        folder.IsPartiallySelectedForConversion = conversionSelection == null;
+                    }
+                }
+            }
+            
+            FileLogger.Log("RestoreSelections tamamlandı");
+        }
+
         private async Task GoUpAsync()
         {
             var parent = Directory.GetParent(CurrentPath);
@@ -232,47 +473,82 @@ namespace RvtToNavisConverter.ViewModels
         private async Task ProcessFilesAsync()
         {
             // Save current selections before processing
-            foreach (var item in FileSystemItems)
-            {
-                if (item.IsSelectedForDownload || item.IsSelectedForConversion)
-                {
-                    _selectedItems[item.Path] = item;
-                }
-                else
-                {
-                    _selectedItems.Remove(item.Path);
-                }
-            }
+            SaveCurrentSelections();
 
             var filesToDownload = new List<FileItem>();
             var filesToConvert = new List<FileItem>();
 
-            foreach (var item in _selectedItems.Values)
+// Use SelectionManager to get all selections
+var allSelections = _selectionManager.GetAllSelections();
+var folderMarkers = allSelections.Keys
+    .Where(k => k.EndsWith("\\*"))
+    .ToList();
+
+// Process file selections first
+foreach (var item in _selectedItems.Values)
+{
+    if (item is FileItem file)
+    {
+        if (file.IsSelectedForDownload == true)
+        {
+            filesToDownload.Add(file);
+        }
+        if (file.IsSelectedForConversion == true)
+        {
+            filesToConvert.Add(file);
+        }
+    }
+}
+
+// Process folder markers (these represent fully selected folders)
+foreach (var marker in folderMarkers)
+{
+    var folderPath = marker.Substring(0, marker.Length - 2); // Remove the \* suffix
+    var selectionState = allSelections[marker];
+    
+    if (selectionState.IsSelectedForDownload == true || selectionState.IsSelectedForConversion == true)
+    {
+        var isLocal = _selectedItems.Values
+            .OfType<IFileSystemItem>()
+            .FirstOrDefault(i => i.Path.Equals(folderPath, StringComparison.OrdinalIgnoreCase))?.IsLocal ?? false;
+            
+        var allFiles = await GetAllFilesRecursive(folderPath, isLocal);
+        
+        if (selectionState.IsSelectedForDownload == true)
+        {
+            filesToDownload.AddRange(allFiles);
+        }
+        if (selectionState.IsSelectedForConversion == true)
+        {
+            filesToConvert.AddRange(allFiles);
+        }
+    }
+}
+
+// Process folder selections that aren't fully selected
+foreach (var item in _selectedItems.Values)
+{
+    if (item is FolderItem folder)
+    {
+        // Skip folders that are already processed via markers
+        if (folderMarkers.Any(m => m.StartsWith(folder.Path, StringComparison.OrdinalIgnoreCase)))
+            continue;
+            
+        if (folder.IsSelectedForDownload == true || folder.IsSelectedForConversion == true)
+        {
+            var allFiles = await GetAllFilesRecursive(folder.Path, item.IsLocal);
+            
+            if (folder.IsSelectedForDownload == true)
             {
-                if (item is FolderItem folder && (folder.IsSelectedForDownload || folder.IsSelectedForConversion))
-                {
-                    var allFiles = await GetAllFilesRecursive(folder.Path, item.IsLocal);
-                    if (folder.IsSelectedForDownload)
-                    {
-                        filesToDownload.AddRange(allFiles);
-                    }
-                    if (folder.IsSelectedForConversion)
-                    {
-                        filesToConvert.AddRange(allFiles);
-                    }
-                }
-                else if (item is FileItem file)
-                {
-                    if (file.IsSelectedForDownload)
-                    {
-                        filesToDownload.Add(file);
-                    }
-                    if (file.IsSelectedForConversion)
-                    {
-                        filesToConvert.Add(file);
-                    }
-                }
+                filesToDownload.AddRange(allFiles);
             }
+            if (folder.IsSelectedForConversion == true)
+            {
+                filesToConvert.AddRange(allFiles);
+            }
+        }
+    }
+}
 
             var filesToProcess = filesToDownload.Union(filesToConvert).Distinct().ToList();
 
@@ -289,14 +565,13 @@ namespace RvtToNavisConverter.ViewModels
             {
                 _progressViewModel.Reset();
                 _progressWindow = new ProgressView { DataContext = _progressViewModel };
-                _progressWindow.Closed += (s, e) => _progressWindow = null;
+                _progressWindow.Closed += (s, e) => { _progressWindow = null; };
                 _progressWindow.Show();
             }
             else
             {
                 _progressViewModel.ResetProgress();
             }
-
 
             try
             {
@@ -341,7 +616,7 @@ namespace RvtToNavisConverter.ViewModels
 
                     // --- Conversion Phase ---
                     var finalConversionList = filesToConvert
-                        .Where(f => !f.IsSelectedForDownload || successfullyDownloadedFiles.Contains(f))
+                        .Where(f => !(f.IsSelectedForDownload == true) || successfullyDownloadedFiles.Contains(f))
                         .ToList();
 
                     if (finalConversionList.Any())

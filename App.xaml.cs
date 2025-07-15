@@ -34,6 +34,7 @@ namespace RvtToNavisConverter
             services.AddSingleton<INavisworksConversionService, NavisworksConversionService>();
             services.AddSingleton<IFileStatusService, FileStatusService>();
             services.AddSingleton<IValidationService, ValidationService>();
+            services.AddSingleton<SelectionManager>();
 
             // ViewModels
             services.AddSingleton<MainViewModel>();
@@ -59,8 +60,16 @@ namespace RvtToNavisConverter
                 var mainWindow = _serviceProvider!.GetService<MainWindow>();
                 if (mainWindow != null)
                 {
-                    mainWindow.DataContext = _serviceProvider.GetService<MainViewModel>();
-                    mainWindow.Show();
+                    var mainViewModel = _serviceProvider.GetService<MainViewModel>();
+                    if (mainViewModel != null)
+                    {
+                        mainWindow.DataContext = mainViewModel;
+                        mainWindow.Show();
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("MainViewModel could not be resolved from the service provider.");
+                    }
                 }
             }
             catch (Exception ex)

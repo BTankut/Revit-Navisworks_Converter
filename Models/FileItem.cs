@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -9,26 +10,33 @@ namespace RvtToNavisConverter.Models
         public string Path { get; set; } = string.Empty;
         public bool IsDirectory => false;
 
-        // Additional properties specific to files
-        private bool _isSelectedForDownload;
-        public bool IsSelectedForDownload
+        private bool? _isSelectedForDownload = false;
+        public bool? IsSelectedForDownload
         {
             get => _isSelectedForDownload;
             set
             {
-                _isSelectedForDownload = value;
-                OnPropertyChanged();
+                if (_isSelectedForDownload != value)
+                {
+                    _isSelectedForDownload = value;
+                    OnPropertyChanged();
+                    OnSelectionChanged();
+                }
             }
         }
 
-        private bool _isSelectedForConversion;
-        public bool IsSelectedForConversion
+        private bool? _isSelectedForConversion = false;
+        public bool? IsSelectedForConversion
         {
             get => _isSelectedForConversion;
             set
             {
-                _isSelectedForConversion = value;
-                OnPropertyChanged();
+                if (_isSelectedForConversion != value)
+                {
+                    _isSelectedForConversion = value;
+                    OnPropertyChanged();
+                    OnSelectionChanged();
+                }
             }
         }
         public bool IsLocal { get; set; }
@@ -48,6 +56,12 @@ namespace RvtToNavisConverter.Models
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public event EventHandler? SelectionChanged;
+        protected virtual void OnSelectionChanged()
+        {
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
