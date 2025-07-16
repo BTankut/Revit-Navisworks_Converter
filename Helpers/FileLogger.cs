@@ -40,5 +40,15 @@ Inner Exception:
                 // Ignore logging errors
             }
         }
+
+        public static void LogError(string message)
+        {
+            Log($"ERROR: {message}");
+        }
+
+        public static void LogWarning(string message)
+        {
+            Log($"WARNING: {message}");
+        }
     }
 }

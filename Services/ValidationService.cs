@@ -52,6 +52,7 @@ namespace RvtToNavisConverter.Services
                 {
                     return ValidationStatus.Valid;
                 }
+                
                 // Check if the parent directory exists to determine if we can create it
                 var parent = Directory.GetParent(path);
                 return parent != null && parent.Exists ? ValidationStatus.Warning : ValidationStatus.Invalid;

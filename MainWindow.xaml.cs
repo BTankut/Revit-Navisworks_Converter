@@ -1,5 +1,8 @@
 using RvtToNavisConverter.Models;
 using RvtToNavisConverter.ViewModels;
+using RvtToNavisConverter.Helpers;
+using RvtToNavisConverter.Views;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,6 +15,40 @@ namespace RvtToNavisConverter
         {
             InitializeComponent();
             // DataContext will be set from App.xaml.cs using Dependency Injection
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Check permissions on startup
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                var permissionResults = PermissionChecker.ValidateAllPermissions();
+                var hasIssues = permissionResults.Any(r => !r.HasPermission);
+
+                if (hasIssues)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        var dialog = new PermissionDialog(permissionResults)
+                        {
+                            Owner = this
+                        };
+
+                        var result = dialog.ShowDialog();
+                        
+                        if (result != true && !dialog.ContinueWithIssues)
+                        {
+                            // User chose to exit
+                            Application.Current.Shutdown();
+                        }
+                        else if (dialog.ContinueWithIssues)
+                        {
+                            // Log warning that we're continuing with issues
+                            FileLogger.LogWarning("Application started with unresolved permission issues.");
+                        }
+                    });
+                }
+            });
         }
 
         private void ListViewItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)

@@ -305,6 +305,7 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
 
         private void OpenSettings()
         {
+            _settingsViewModel.RefreshValidation();
             var settingsWindow = new SettingsView { DataContext = _settingsViewModel };
             settingsWindow.ShowDialog();
         }
@@ -482,7 +483,7 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
 
                 FileSystemItems = new ObservableCollection<IFileSystemItem>(items);
                 CurrentPath = path;
-                StatusMessage = $"Currently viewing: {CurrentPath}";
+                StatusMessage = "Ready";
             }
             catch (OperationCanceledException)
             {

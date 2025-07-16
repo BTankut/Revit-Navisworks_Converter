@@ -9,7 +9,8 @@
         xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
-        Title="Revit to Navisworks Converter" Height="600" Width="900">
+        Title="Revit to Navisworks Converter v1.6.0 © 2025 Baris Tankut" Height="600" Width="900"
+        Loaded="Window_Loaded">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <helpers:FileSystemTypeToIconConverter x:Key="FileSystemTypeToIconConverter"/>
@@ -60,30 +61,46 @@
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <EventSetter Event="MouseDoubleClick" Handler="ListViewItem_MouseDoubleClick"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="D" Width="30">
+                    <GridView.ColumnHeaderContainerStyle>
+                        <Style TargetType="GridViewColumnHeader">
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        </Style>
+                    </GridView.ColumnHeaderContainerStyle>
+                    <GridViewColumn Width="50">
+                        <GridViewColumn.Header>
+                            <materialDesign:PackIcon Kind="Download" ToolTip="Download"/>
+                        </GridViewColumn.Header>
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <CheckBox IsEnabled="{Binding IsLocal, Converter={StaticResource BooleanToNegativeVisibilityConverter}}" 
-                                          IsChecked="{Binding IsSelectedForDownload, Mode=OneWay}" 
-                                          IsThreeState="True"
-                                          HorizontalAlignment="Center" 
-                                          ToolTip="Download"
-                                          Click="DownloadCheckBox_Click" />
+                                <Grid HorizontalAlignment="Stretch">
+                                    <CheckBox IsEnabled="{Binding IsLocal, Converter={StaticResource BooleanToNegativeVisibilityConverter}}" 
+                                              IsChecked="{Binding IsSelectedForDownload, Mode=OneWay}" 
+                                              IsThreeState="True"
+                                              HorizontalAlignment="Center" 
+                                              ToolTip="Download"
+                                              Click="DownloadCheckBox_Click" />
+                                </Grid>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn Header="C" Width="30">
+                    <GridViewColumn Width="50">
+                        <GridViewColumn.Header>
+                            <materialDesign:PackIcon Kind="Sync" ToolTip="Convert"/>
+                        </GridViewColumn.Header>
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsSelectedForConversion, Mode=OneWay}" 
-                                          IsThreeState="True"
-                                          HorizontalAlignment="Center" 
-                                          ToolTip="Convert"
-                                          Click="ConversionCheckBox_Click" />
+                                <Grid HorizontalAlignment="Stretch">
+                                    <CheckBox IsChecked="{Binding IsSelectedForConversion, Mode=OneWay}" 
+                                              IsThreeState="True"
+                                              HorizontalAlignment="Center" 
+                                              ToolTip="Convert"
+                                              Click="ConversionCheckBox_Click" />
+                                </Grid>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
@@ -107,5 +124,6 @@
                 <TextBlock Text="{Binding StatusMessage}"/>
             </StatusBarItem>
         </StatusBar>
+
     </Grid>
 </Window>

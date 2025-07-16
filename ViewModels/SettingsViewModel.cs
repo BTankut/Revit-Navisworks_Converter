@@ -98,5 +98,10 @@ namespace RvtToNavisConverter.ViewModels
             AppSettings = _settingsService.LoadSettings();
             _ = ValidateAllAsync();
         }
+
+        public void RefreshValidation()
+        {
+            _ = ValidateAllAsync();
+        }
     }
 }
