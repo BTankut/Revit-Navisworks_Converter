@@ -10,6 +10,7 @@ namespace RvtToNavisConverter.Services
     public class SelectionManager
     {
         private readonly Dictionary<string, SelectionState> _selectionStates = new Dictionary<string, SelectionState>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<string>> _folderContents = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         
         public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
 
@@ -216,11 +217,20 @@ namespace RvtToNavisConverter.Services
                 var children = new List<string>();
                 if (currentItems != null)
                 {
-                    var parentDir = Path.GetDirectoryName(changedPath);
-                    if (!string.IsNullOrEmpty(parentDir) && parentDir.Equals(parentPath, StringComparison.OrdinalIgnoreCase))
+                    // Bu parentPath'in altındaki tüm öğeleri bul
+                    var childrenFromUI = currentItems
+                        .Where(item => {
+                            var itemParentPath = Path.GetDirectoryName(item.Path);
+                            return !string.IsNullOrEmpty(itemParentPath) && 
+                                   itemParentPath.Equals(parentPath, StringComparison.OrdinalIgnoreCase);
+                        })
+                        .Select(item => item.Path)
+                        .ToList();
+                    
+                    if (childrenFromUI.Any())
                     {
-                        children.AddRange(currentItems.Select(item => item.Path));
-                        FileLogger.Log($"  UI'dan {children.Count} alt öğe bulundu");
+                        children.AddRange(childrenFromUI);
+                        FileLogger.Log($"  UI'dan {children.Count} alt öğe bulundu: {string.Join(", ", children)}");
                     }
                 }
                 
@@ -228,7 +238,7 @@ namespace RvtToNavisConverter.Services
                 if (!children.Any())
                 {
                     children = GetChildren(parentPath);
-                    FileLogger.Log($"  Kayıtlardan {children.Count} alt öğe bulundu");
+                    FileLogger.Log($"  Kayıtlardan {children.Count} alt öğe bulundu: {string.Join(", ", children)}");
                 }
                 
                 if (children.Any())
@@ -294,14 +304,27 @@ namespace RvtToNavisConverter.Services
             }
         }
 
-        private List<string> GetChildren(string folderPath)
+        public List<string> GetChildren(string folderPath)
         {
             if (string.IsNullOrEmpty(folderPath)) return new List<string>();
             
+            // Önce kayıtlı folder contents'i kontrol et
+            if (_folderContents.ContainsKey(folderPath))
+            {
+                return _folderContents[folderPath];
+            }
+            
+            // Yoksa seçili olanları döndür
             return _selectionStates.Keys
                 .Where(path => !path.EndsWith("\\*") && 
                        Path.GetDirectoryName(path)?.Equals(folderPath, StringComparison.OrdinalIgnoreCase) == true)
                 .ToList();
+        }
+        
+        public void SetFolderContents(string folderPath, List<string> contents)
+        {
+            if (string.IsNullOrEmpty(folderPath)) return;
+            _folderContents[folderPath] = contents;
         }
 
         public void ClearAllSelections()

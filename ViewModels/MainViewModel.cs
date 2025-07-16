@@ -141,6 +141,8 @@ ToggleDownloadCommand = new RelayCommand(
 
         private void SelectionManager_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
+            FileLogger.Log($"SelectionManager_SelectionChanged: Path={e.Path}, IsDownload={e.IsDownload}, Value={e.Value}, IsMarker={e.IsMarker}");
+            
             // When selection changes in SelectionManager, update UI
             if (e.Path == "*") // Special case for ClearAllSelections
             {
@@ -246,7 +248,7 @@ ToggleDownloadCommand = new RelayCommand(
             }
             else
             {
-                FileLogger.Log($"UI öğesi bulunamadı: {e.Path}");
+                FileLogger.Log($"UI öğesi bulunamadı (bu normal, üst klasör olabilir): {e.Path}");
             }
         }
 
@@ -371,10 +373,111 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                     items = await Task.Run(() => _revitServerService.GetDirectoryContentsAsync(path, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
                 }
 
+            // Mevcut klasörün içeriğini SelectionManager'a kaydet (hem dosyalar hem klasörler)
+            var currentFolderItems = items.Select(i => i.Path).ToList();
+            if (currentFolderItems.Any())
+            {
+                _selectionManager.SetFolderContents(path, currentFolderItems);
+                var fileCount = items.Count(i => !i.IsDirectory);
+                var folderCount = items.Count(i => i.IsDirectory);
+                FileLogger.Log($"Klasör içeriği kaydedildi: {path} - {fileCount} dosya, {folderCount} klasör");
+            }
+            
             // Restore selections only if there are any saved selections
             if (_selectedItems.Count > 0 || _selectionManager.GetAllSelections().Count > 0)
             {
                 RestoreSelections(items);
+            }
+            
+            // Tüm öğelerin üst klasör durumlarını güncelle
+            foreach (var item in items)
+            {
+                if (item.IsDirectory)
+                {
+                    FileLogger.Log($"Klasör durumu kontrol ediliyor: {item.Path}");
+                    
+                    // Bu klasörün tüm alt öğelerini bul
+                    // Önce SelectionManager'dan kayıtlı olanları al (seçili olanlar)
+                    var selectedChildren = _selectionManager.GetAllSelections().Keys
+                        .Where(k => !k.EndsWith("\\*") && 
+                               Path.GetDirectoryName(k)?.Equals(item.Path, StringComparison.OrdinalIgnoreCase) == true)
+                        .ToList();
+                    
+                    // Eğer bu klasör için folder marker varsa, o klasörün gerçek dosya sayısını al
+                    var folderMarker = item.Path.TrimEnd('\\') + "\\*";
+                    var allSelections = _selectionManager.GetAllSelections();
+                    
+                    var children = new List<string>();
+                    
+                    // Öncelikle GetChildren kullanarak gerçek dosya sayısını al
+                    children = _selectionManager.GetChildren(item.Path);
+                    
+                    if (!children.Any())
+                    {
+                        // GetChildren boşsa, seçili olanları kullan
+                        children = selectedChildren;
+                    }
+                    
+                    FileLogger.Log($"  GetChildren sonucu: {children.Count} adet - {string.Join(", ", children.Take(3))}{(children.Count > 3 ? "..." : "")}");
+                    
+                    // Eğer hiç child yoksa, bir önceki seçim işleminden kalan dosyaları kontrol et
+                    if (!children.Any())
+                    {
+                        // Son çare: tüm kayıtlı dosyaları kontrol et
+                        children = allSelections.Keys
+                            .Where(k => !k.EndsWith("\\*") && 
+                                   k.StartsWith(item.Path, StringComparison.OrdinalIgnoreCase) &&
+                                   Path.GetDirectoryName(k)?.Equals(item.Path, StringComparison.OrdinalIgnoreCase) == true)
+                            .ToList();
+                    }
+                    
+                    if (children.Any())
+                    {
+                        FileLogger.Log($"  Alt öğeleri var: {children.Count} adet");
+                        
+                        // Download durumunu kontrol et
+                        var downloadStates = children.Select(c => _selectionManager.GetSelection(c, true)).ToList();
+                        var downloadSelected = downloadStates.Count(s => s == true);
+                        var downloadUnselected = downloadStates.Count(s => s == false || s == null);
+                        
+                        if (downloadSelected > 0 && downloadUnselected > 0)
+                        {
+                            FileLogger.Log($"  Download için indeterminate: seçili={downloadSelected}, seçili değil={downloadUnselected}");
+                            item.IsSelectedForDownload = null;
+                        }
+                        else if (downloadSelected == children.Count)
+                        {
+                            FileLogger.Log($"  Download için tümü seçili");
+                            item.IsSelectedForDownload = true;
+                        }
+                        else
+                        {
+                            FileLogger.Log($"  Download için hiçbiri seçili değil");
+                            item.IsSelectedForDownload = false;
+                        }
+                        
+                        // Conversion durumunu kontrol et
+                        var conversionStates = children.Select(c => _selectionManager.GetSelection(c, false)).ToList();
+                        var conversionSelected = conversionStates.Count(s => s == true);
+                        var conversionUnselected = conversionStates.Count(s => s == false || s == null);
+                        
+                        if (conversionSelected > 0 && conversionUnselected > 0)
+                        {
+                            FileLogger.Log($"  Conversion için indeterminate: seçili={conversionSelected}, seçili değil={conversionUnselected}");
+                            item.IsSelectedForConversion = null;
+                        }
+                        else if (conversionSelected == children.Count)
+                        {
+                            FileLogger.Log($"  Conversion için tümü seçili");
+                            item.IsSelectedForConversion = true;
+                        }
+                        else
+                        {
+                            FileLogger.Log($"  Conversion için hiçbiri seçili değil");
+                            item.IsSelectedForConversion = false;
+                        }
+                    }
+                }
             }
 
                 FileSystemItems = new ObservableCollection<IFileSystemItem>(items);
