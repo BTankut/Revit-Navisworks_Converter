@@ -8,5 +8,6 @@ namespace RvtToNavisConverter.Models
         bool? IsSelectedForDownload { get; set; }
         bool? IsSelectedForConversion { get; set; }
         bool IsLocal { get; set; }
+        string RevitVersion { get; set; }
     }
 }

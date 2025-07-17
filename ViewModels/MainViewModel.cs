@@ -23,6 +23,7 @@ namespace RvtToNavisConverter.ViewModels
         private readonly IFileDownloadService _fileDownloadService;
         private readonly INavisworksConversionService _navisworksConversionService;
         private readonly IFileStatusService _fileStatusService;
+        private readonly IRevitFileVersionService _revitFileVersionService;
         private readonly SettingsViewModel _settingsViewModel;
         private readonly ProgressViewModel _progressViewModel;
         private readonly MonitorViewModel _monitorViewModel;
@@ -73,7 +74,7 @@ namespace RvtToNavisConverter.ViewModels
         private CancellationTokenSource? _cancellationTokenSource;
         private readonly Dictionary<string, IFileSystemItem> _selectedItems = new Dictionary<string, IFileSystemItem>();
 
-        public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper, SelectionManager selectionManager)
+        public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, IRevitFileVersionService revitFileVersionService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper, SelectionManager selectionManager)
         {
             _serviceProvider = serviceProvider;
             _settingsService = settingsService;
@@ -82,6 +83,7 @@ namespace RvtToNavisConverter.ViewModels
             _fileDownloadService = fileDownloadService;
             _navisworksConversionService = navisworksConversionService;
             _fileStatusService = fileStatusService;
+            _revitFileVersionService = revitFileVersionService;
             _settingsViewModel = settingsViewModel;
             _progressViewModel = progressViewModel;
             _monitorViewModel = monitorViewModel;
@@ -390,6 +392,36 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                 RestoreSelections(items);
             }
             
+            // Read Revit version for .rvt files
+            var revitFiles = items.OfType<FileItem>().Where(f => f.Name.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase));
+            foreach (var file in revitFiles)
+            {
+                // For server files, try to extract version from path first
+                if (!isLocal && !string.IsNullOrEmpty(file.Path))
+                {
+                    var versionFromPath = _revitFileVersionService.GetRevitVersionFromServerPath(file.Path);
+                    if (!string.IsNullOrEmpty(versionFromPath))
+                    {
+                        file.RevitVersion = versionFromPath;
+                        FileLogger.Log($"Detected version {versionFromPath} from server path for file: {file.Name}");
+                        continue;
+                    }
+                }
+                
+                // For local files or if server path extraction failed, read from file content
+                if (isLocal)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        var version = await _revitFileVersionService.GetRevitFileVersionAsync(file.Path);
+                        if (!string.IsNullOrEmpty(version))
+                        {
+                            Application.Current.Dispatcher.Invoke(() => file.RevitVersion = version);
+                        }
+                    });
+                }
+            }
+            
             // Tüm öğelerin üst klasör durumlarını güncelle
             foreach (var item in items)
             {
@@ -682,6 +714,38 @@ foreach (var item in _selectedItems.Values)
                 await Task.Run(async () =>
                 {
                     var settings = _settingsService.LoadSettings();
+                    
+                    // Version compatibility check
+                    var incompatibleFiles = new List<string>();
+                    foreach (var file in filesToProcess)
+                    {
+                        if (!string.IsNullOrEmpty(file.RevitVersion) && !string.IsNullOrEmpty(settings.SelectedRevitServerToolVersion))
+                        {
+                            if (!_revitFileVersionService.IsVersionCompatible(file.RevitVersion, settings.SelectedRevitServerToolVersion))
+                            {
+                                incompatibleFiles.Add($"{file.Name} (File: {file.RevitVersion}, Tool: {settings.SelectedRevitServerToolVersion})");
+                            }
+                        }
+                    }
+                    
+                    if (incompatibleFiles.Any())
+                    {
+                        var message = $"Version compatibility warning:\n\n" +
+                                     $"The following files have different versions than the selected Revit Server Tool:\n\n" +
+                                     string.Join("\n", incompatibleFiles.Take(10)) +
+                                     (incompatibleFiles.Count > 10 ? $"\n... and {incompatibleFiles.Count - 10} more files" : "") +
+                                     "\n\nDo you want to continue anyway?";
+                        
+                        var result = Application.Current.Dispatcher.Invoke(() => 
+                            MessageBox.Show(message, "Version Compatibility Warning", MessageBoxButton.YesNo, MessageBoxImage.Warning));
+                        
+                        if (result != MessageBoxResult.Yes)
+                        {
+                            _progressViewModel.AddLog("Process cancelled due to version incompatibility");
+                            return;
+                        }
+                    }
+                    
                     var successfullyDownloadedFiles = new List<FileItem>();
                     int totalFiles = filesToProcess.Count;
                     int filesCompleted = 0;
@@ -700,6 +764,18 @@ foreach (var item in _selectedItems.Values)
                                 UpdateFileStatus(file, "Downloaded");
                                 _progressViewModel.AddLog($"{file.Name} - Downloaded");
                                 successfullyDownloadedFiles.Add(file);
+                                
+                                // Read version info after download
+                                var localPath = System.IO.Path.Combine(settings.DefaultDownloadPath, file.Name);
+                                if (System.IO.File.Exists(localPath))
+                                {
+                                    var version = await _revitFileVersionService.GetRevitFileVersionAsync(localPath);
+                                    if (!string.IsNullOrEmpty(version))
+                                    {
+                                        Application.Current.Dispatcher.Invoke(() => file.RevitVersion = version);
+                                        FileLogger.Log($"Read version {version} for downloaded file: {file.Name}");
+                                    }
+                                }
                             }
                             else
                             {

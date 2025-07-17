@@ -25,7 +25,12 @@
       "Bash(dir:*)",
       "Bash(npm uninstall:*)",
       "Bash(node:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "Bash(xxd:*)",
+      "Bash(powershell:*)",
+      "Bash(dotnet build:*)",
+      "Bash(del \"C:\\Users\\BT\\CascadeProjects\\RVT to Navis Cline\\RvtToNavisConverter\\TestRevitVersion.cs\")",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

@@ -35,6 +35,7 @@ namespace RvtToNavisConverter
             services.AddSingleton<IFileStatusService, FileStatusService>();
             services.AddSingleton<IValidationService, ValidationService>();
             services.AddSingleton<IToolDetectionService, ToolDetectionService>();
+            services.AddSingleton<IRevitFileVersionService, RevitFileVersionService>();
             services.AddSingleton<SelectionManager>();
 
             // ViewModels

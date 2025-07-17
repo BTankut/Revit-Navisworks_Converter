@@ -41,6 +41,9 @@ namespace RvtToNavisConverter.Models
         }
 
         public bool IsLocal { get; set; }
+        
+        // RevitVersion is not applicable for folders, but required by interface
+        public string RevitVersion { get; set; } = string.Empty;
 
         private bool _isPartiallySelectedForDownload;
         public bool IsPartiallySelectedForDownload

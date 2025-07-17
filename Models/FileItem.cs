@@ -41,6 +41,20 @@ namespace RvtToNavisConverter.Models
         }
         public bool IsLocal { get; set; }
 
+        private string _revitVersion = string.Empty;
+        public string RevitVersion
+        {
+            get => _revitVersion;
+            set
+            {
+                if (_revitVersion != value)
+                {
+                    _revitVersion = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         private string _status = "Pending";
         public string Status
         {
