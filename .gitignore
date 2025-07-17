@@ -76,3 +76,12 @@ _ReSharper*/
 # Tools
 *.ps1
 *.txt
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Node.js (MCP Integration)
+node_modules/
+package.json
+package-lock.json
