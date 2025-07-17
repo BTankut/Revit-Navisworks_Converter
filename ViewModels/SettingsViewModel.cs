@@ -4,6 +4,7 @@ using RvtToNavisConverter.Services;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -13,6 +14,7 @@ namespace RvtToNavisConverter.ViewModels
     {
         private readonly ISettingsService _settingsService;
         private readonly IValidationService _validationService;
+        private readonly IToolDetectionService _toolDetectionService;
         private AppSettings _appSettings;
 
         public AppSettings AppSettings
@@ -42,10 +44,66 @@ namespace RvtToNavisConverter.ViewModels
         private ValidationStatus _defaultNwdPathStatus;
         public ValidationStatus DefaultNwdPathStatus { get => _defaultNwdPathStatus; set { _defaultNwdPathStatus = value; OnPropertyChanged(); } }
 
+        // Tool detection properties
+        private ObservableCollection<ToolVersion> _detectedRevitServerTools;
+        public ObservableCollection<ToolVersion> DetectedRevitServerTools
+        {
+            get => _detectedRevitServerTools;
+            set { _detectedRevitServerTools = value; OnPropertyChanged(); }
+        }
+
+        private ObservableCollection<ToolVersion> _detectedNavisworksTools;
+        public ObservableCollection<ToolVersion> DetectedNavisworksTools
+        {
+            get => _detectedNavisworksTools;
+            set { _detectedNavisworksTools = value; OnPropertyChanged(); }
+        }
+
+        private ToolVersion _selectedRevitServerTool;
+        public ToolVersion SelectedRevitServerTool
+        {
+            get => _selectedRevitServerTool;
+            set 
+            { 
+                _selectedRevitServerTool = value; 
+                OnPropertyChanged();
+                if (value != null)
+                {
+                    AppSettings.RevitServerToolPath = value.Path;
+                    AppSettings.SelectedRevitServerToolVersion = value.Version;
+                }
+            }
+        }
+
+        private ToolVersion _selectedNavisworksTool;
+        public ToolVersion SelectedNavisworksTool
+        {
+            get => _selectedNavisworksTool;
+            set 
+            { 
+                _selectedNavisworksTool = value; 
+                OnPropertyChanged();
+                if (value != null)
+                {
+                    AppSettings.NavisworksToolPath = value.Path;
+                    AppSettings.SelectedNavisworksToolVersion = value.Version;
+                }
+            }
+        }
+
+        private bool _isDetectingTools;
+        public bool IsDetectingTools
+        {
+            get => _isDetectingTools;
+            set { _isDetectingTools = value; OnPropertyChanged(); }
+        }
 
         public ICommand SaveCommand { get; }
         public ICommand LoadCommand { get; }
         public ICommand ValidateAllCommand { get; }
+        public ICommand DetectRevitServerToolsCommand { get; }
+        public ICommand DetectNavisworksToolsCommand { get; }
+        public ICommand DetectAllToolsCommand { get; }
         public ICommand ValidateRevitServerIpCommand { get; }
         public ICommand ValidateRevitServerAcceleratorCommand { get; }
         public ICommand ValidateRevitToolPathCommand { get; }
@@ -55,15 +113,22 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand ValidateDefaultNwdPathCommand { get; }
 
 
-        public SettingsViewModel(ISettingsService settingsService, IValidationService validationService)
+        public SettingsViewModel(ISettingsService settingsService, IValidationService validationService, IToolDetectionService toolDetectionService)
         {
             _settingsService = settingsService;
             _validationService = validationService;
+            _toolDetectionService = toolDetectionService;
             _appSettings = _settingsService.LoadSettings();
+
+            DetectedRevitServerTools = new ObservableCollection<ToolVersion>();
+            DetectedNavisworksTools = new ObservableCollection<ToolVersion>();
 
             SaveCommand = new RelayCommand(_ => SaveSettings());
             LoadCommand = new RelayCommand(_ => LoadSettings());
             ValidateAllCommand = new RelayCommand(async _ => await ValidateAllAsync());
+            DetectRevitServerToolsCommand = new RelayCommand(async _ => await DetectRevitServerToolsAsync());
+            DetectNavisworksToolsCommand = new RelayCommand(async _ => await DetectNavisworksToolsAsync());
+            DetectAllToolsCommand = new RelayCommand(async _ => await DetectAllToolsAsync());
 
             ValidateRevitServerIpCommand = new RelayCommand(async _ => RevitServerIpStatus = await _validationService.ValidateIpAddressAsync(AppSettings.RevitServerIp));
             ValidateRevitServerAcceleratorCommand = new RelayCommand(async _ => RevitServerAcceleratorStatus = await _validationService.ValidateIpAddressAsync(AppSettings.RevitServerAccelerator));
@@ -74,6 +139,115 @@ namespace RvtToNavisConverter.ViewModels
             ValidateDefaultNwdPathCommand = new RelayCommand(_ => DefaultNwdPathStatus = _validationService.ValidatePath(AppSettings.DefaultNwdPath, false));
 
             _ = ValidateAllAsync();
+            _ = LoadDetectedTools();
+        }
+
+        private async Task LoadDetectedTools()
+        {
+            // Load previously detected tools if any
+            if (AppSettings.DetectedRevitServerTools?.Any() == true)
+            {
+                DetectedRevitServerTools.Clear();
+                foreach (var tool in AppSettings.DetectedRevitServerTools)
+                {
+                    DetectedRevitServerTools.Add(tool);
+                }
+                
+                // Select the previously selected tool
+                if (!string.IsNullOrEmpty(AppSettings.SelectedRevitServerToolVersion))
+                {
+                    SelectedRevitServerTool = DetectedRevitServerTools.FirstOrDefault(t => t.Version == AppSettings.SelectedRevitServerToolVersion);
+                }
+            }
+
+            if (AppSettings.DetectedNavisworksTools?.Any() == true)
+            {
+                DetectedNavisworksTools.Clear();
+                foreach (var tool in AppSettings.DetectedNavisworksTools)
+                {
+                    DetectedNavisworksTools.Add(tool);
+                }
+                
+                // Select the previously selected tool
+                if (!string.IsNullOrEmpty(AppSettings.SelectedNavisworksToolVersion))
+                {
+                    SelectedNavisworksTool = DetectedNavisworksTools.FirstOrDefault(t => t.Version == AppSettings.SelectedNavisworksToolVersion);
+                }
+            }
+        }
+
+        private async Task DetectRevitServerToolsAsync()
+        {
+            try
+            {
+                IsDetectingTools = true;
+                var tools = await _toolDetectionService.DetectRevitServerToolsAsync();
+                
+                DetectedRevitServerTools.Clear();
+                foreach (var tool in tools)
+                {
+                    DetectedRevitServerTools.Add(tool);
+                }
+
+                // Update AppSettings
+                AppSettings.DetectedRevitServerTools = tools;
+
+                // Select the first tool if none selected
+                if (SelectedRevitServerTool == null && tools.Any())
+                {
+                    SelectedRevitServerTool = tools.First();
+                }
+
+                FileLogger.Log($"Detected {tools.Count} Revit Server Tool versions");
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Log($"Error detecting Revit Server Tools: {ex.Message}");
+            }
+            finally
+            {
+                IsDetectingTools = false;
+            }
+        }
+
+        private async Task DetectNavisworksToolsAsync()
+        {
+            try
+            {
+                IsDetectingTools = true;
+                var tools = await _toolDetectionService.DetectNavisworksToolsAsync();
+                
+                DetectedNavisworksTools.Clear();
+                foreach (var tool in tools)
+                {
+                    DetectedNavisworksTools.Add(tool);
+                }
+
+                // Update AppSettings
+                AppSettings.DetectedNavisworksTools = tools;
+
+                // Select the first tool if none selected
+                if (SelectedNavisworksTool == null && tools.Any())
+                {
+                    SelectedNavisworksTool = tools.First();
+                }
+
+                FileLogger.Log($"Detected {tools.Count} Navisworks Tool versions");
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Log($"Error detecting Navisworks Tools: {ex.Message}");
+            }
+            finally
+            {
+                IsDetectingTools = false;
+            }
+        }
+
+        private async Task DetectAllToolsAsync()
+        {
+            await DetectRevitServerToolsAsync();
+            await DetectNavisworksToolsAsync();
         }
 
         private async Task ValidateAllAsync()
@@ -97,6 +271,7 @@ namespace RvtToNavisConverter.ViewModels
         {
             AppSettings = _settingsService.LoadSettings();
             _ = ValidateAllAsync();
+            _ = LoadDetectedTools();
         }
 
         public void RefreshValidation()

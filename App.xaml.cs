@@ -34,6 +34,7 @@ namespace RvtToNavisConverter
             services.AddSingleton<INavisworksConversionService, NavisworksConversionService>();
             services.AddSingleton<IFileStatusService, FileStatusService>();
             services.AddSingleton<IValidationService, ValidationService>();
+            services.AddSingleton<IToolDetectionService, ToolDetectionService>();
             services.AddSingleton<SelectionManager>();
 
             // ViewModels

@@ -5,12 +5,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:RvtToNavisConverter.Views"
         xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
+        xmlns:converters="clr-namespace:RvtToNavisConverter.Helpers.Converters"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
         Title="Settings" Height="550" Width="800">
     <Window.Resources>
         <helpers:ValidationStatusToIconConverter x:Key="ValidationStatusToIconConverter"/>
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
     </Window.Resources>
     <Grid Margin="15">
         <Grid.RowDefinitions>
@@ -71,21 +73,36 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Revit Tool Path"
-                                 Text="{Binding AppSettings.RevitServerToolPath, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
-                                 Margin="0,5">
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Revit Server Tool" FontWeight="Medium" Margin="0,5,0,5"/>
+                        <ComboBox ItemsSource="{Binding DetectedRevitServerTools}"
+                                  SelectedItem="{Binding SelectedRevitServerTool}"
+                                  DisplayMemberPath="DisplayName"
+                                  materialDesign:HintAssist.Hint="Select Revit Server Tool Version"
+                                  Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                                  Margin="0,0,0,5"/>
+                        <TextBox Text="{Binding AppSettings.RevitServerToolPath, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource MaterialDesignTextBox}"
+                                 FontSize="10" Opacity="0.7" Margin="0,0,0,5">
                             <i:Interaction.Triggers>
                                 <i:EventTrigger EventName="LostFocus">
                                     <i:InvokeCommandAction Command="{Binding ValidateRevitToolPathCommand}"/>
                                 </i:EventTrigger>
                             </i:Interaction.Triggers>
                         </TextBox>
-                        <TextBox Text="Example: C:\Program Files\Autodesk\Revit Server 2021\Tools\RevitServerToolCommand\RevitServerTool.exe" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
                     </StackPanel>
-                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding RevitToolPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                    <Button Grid.Column="1" 
+                            Command="{Binding DetectRevitServerToolsCommand}"
+                            IsEnabled="{Binding IsDetectingTools, Converter={StaticResource InverseBooleanConverter}}"
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            ToolTip="Auto-detect Revit Server Tools"
+                            Margin="5,0">
+                        <materialDesign:PackIcon Kind="Magnify" />
+                    </Button>
+                    <materialDesign:PackIcon Grid.Column="2" Kind="{Binding RevitToolPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
                                              VerticalAlignment="Center" Margin="5,0"/>
                 </Grid>
 
@@ -94,21 +111,36 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBox Grid.Column="0" materialDesign:HintAssist.Hint="Navisworks Tool Path"
-                                 Text="{Binding AppSettings.NavisworksToolPath, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
-                                 Margin="0,5">
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Navisworks File Tools" FontWeight="Medium" Margin="0,5,0,5"/>
+                        <ComboBox ItemsSource="{Binding DetectedNavisworksTools}"
+                                  SelectedItem="{Binding SelectedNavisworksTool}"
+                                  DisplayMemberPath="DisplayName"
+                                  materialDesign:HintAssist.Hint="Select Navisworks Tool Version"
+                                  Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                                  Margin="0,0,0,5"/>
+                        <TextBox Text="{Binding AppSettings.NavisworksToolPath, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource MaterialDesignTextBox}"
+                                 FontSize="10" Opacity="0.7" Margin="0,0,0,5">
                             <i:Interaction.Triggers>
                                 <i:EventTrigger EventName="LostFocus">
                                     <i:InvokeCommandAction Command="{Binding ValidateNavisworksToolPathCommand}"/>
                                 </i:EventTrigger>
                             </i:Interaction.Triggers>
                         </TextBox>
-                        <TextBox Text="Example: C:\Program Files\Autodesk\Navisworks Manage 2022\FileToolsTaskRunner.exe" FontStyle="Italic" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"/>
                     </StackPanel>
-                    <materialDesign:PackIcon Grid.Column="1" Kind="{Binding NavisworksToolPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
+                    <Button Grid.Column="1" 
+                            Command="{Binding DetectNavisworksToolsCommand}"
+                            IsEnabled="{Binding IsDetectingTools, Converter={StaticResource InverseBooleanConverter}}"
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            ToolTip="Auto-detect Navisworks Tools"
+                            Margin="5,0">
+                        <materialDesign:PackIcon Kind="Magnify" />
+                    </Button>
+                    <materialDesign:PackIcon Grid.Column="2" Kind="{Binding NavisworksToolPathStatus, Converter={StaticResource ValidationStatusToIconConverter}}" 
                                              VerticalAlignment="Center" Margin="5,0"/>
                 </Grid>
 
@@ -162,6 +194,13 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Detect All Tools" Command="{Binding DetectAllToolsCommand}" 
+                    IsEnabled="{Binding IsDetectingTools, Converter={StaticResource InverseBooleanConverter}}"
+                    Margin="5" HorizontalAlignment="Left">
+                <Button.ToolTip>
+                    <TextBlock Text="Auto-detect all installed Revit Server and Navisworks tools"/>
+                </Button.ToolTip>
+            </Button>
             <Button Content="Validate All" Command="{Binding ValidateAllCommand}" Margin="5"/>
             <Button Content="Save" Command="{Binding SaveCommand}" Margin="5" IsDefault="True"/>
             <Button Content="Reload" Command="{Binding LoadCommand}" Margin="5"/>

@@ -2,7 +2,30 @@
   "permissions": {
     "allow": [
       "Bash(dotnet build)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(claude mcp:*)",
+      "Bash(where git)",
+      "Bash(where git-bash)",
+      "Bash(ls:*)",
+      "Bash(setx:*)",
+      "Bash(set CLAUDE_CODE_GIT_BASH_PATH=C:Program FilesGitbinbash.exe)",
+      "Bash(mkdir:*)",
+      "Bash(npm search:*)",
+      "Bash(claude config show)",
+      "Bash(claude --debug)",
+      "Bash(claude:*)",
+      "Bash(npx:*)",
+      "Bash(dir C:UsersBT.claude)",
+      "Bash(cat:*)",
+      "Bash(echo $HOME)",
+      "Bash(where claude)",
+      "Bash(dir:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)"
     ],
     "deny": []
   }
