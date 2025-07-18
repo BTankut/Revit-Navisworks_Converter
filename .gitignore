@@ -78,8 +78,8 @@ _ReSharper*/
 *.txt
 
 # Claude Code
-.claude/
-CLAUDE.md
+# .claude/
+# CLAUDE.md
 
 # Node.js (MCP Integration)
 node_modules/

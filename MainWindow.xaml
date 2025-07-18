@@ -9,7 +9,7 @@
         xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
-        Title="Revit to Navisworks Converter v1.6.0 © 2025 Baris Tankut" Height="600" Width="900"
+        Title="Revit to Navisworks Converter v2.0.0 © 2025 Baris Tankut" Height="600" Width="900"
         Loaded="Window_Loaded">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>

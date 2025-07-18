@@ -1,97 +1,217 @@
-# Revit to Navisworks Converter
+# RVT to Navisworks Converter
 
-## Overview
+A WPF desktop application for downloading Revit files from Revit Server and converting them to Navisworks formats (.nwd/.nwc).
 
-The Revit to Navisworks Converter is a powerful and flexible desktop application designed to streamline the process of downloading Revit files from a Revit Server and converting them into Navisworks formats (.nwd or .nwc). This tool is built for architects, engineers, and construction professionals who need an efficient way to manage their BIM workflows.
-
-The application provides a user-friendly interface to browse both a remote Revit Server and the local file system, select files for processing, and manage conversion settings.
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-purple.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## Features
 
-- **Revit Server Integration**: Connect to a Revit Server, browse project folders, and download `.rvt` files directly to your local machine.
-- **Local File System Support**: Browse your local computer to select already downloaded or existing `.rvt` files for conversion.
-- **Selective Batch Processing**: Choose which files to download and/or convert, giving you full control over the workflow.
-- **Automated Conversion**: Utilizes the Navisworks `FileToolsTaskRunner.exe` to batch convert Revit files to Navisworks formats.
-- **Consolidated Output**: Merge multiple files into a single `.nwd` file or convert them to individual `.nwc` files.
-- **Automatic Tool Detection**: Automatically discovers installed Revit Server and Navisworks versions on your system.
-- **Version Detection & Compatibility**: Automatically detects Revit file versions and validates tool compatibility before processing.
-- **Configurable Settings**: Easily configure server IP, accelerator information, default file paths, and tool versions through a dedicated settings window.
-- **Real-time Progress Monitoring**: A detailed progress window shows the status of downloads and conversions, including logs for each step.
-- **PowerShell Integration**: Leverages PowerShell for robust and reliable execution of command-line tools.
+### Core Functionality
+- **Revit Server Integration**: Connect to Revit Server and browse/download .rvt files
+- **Local File Support**: Browse and process local Revit files
+- **Batch Processing**: Select multiple files for download and/or conversion
+- **Format Support**: Convert to both .nwd and .nwc Navisworks formats
+- **Progress Tracking**: Real-time progress monitoring with detailed status updates
 
-## Technical Details
+### Advanced Features (v2.0.0)
+- **Automatic Tool Detection**: Scans for installed Revit/Navisworks versions
+- **Version Compatibility**: Detects Revit file versions and validates tool compatibility
+- **Hierarchical Selection**: Smart folder selection with parent/child relationships
+- **Permission Validation**: Startup checks for required file system permissions
+- **PowerShell Logging**: Comprehensive logging of all external tool executions
+- **Windows Server Support**: Fully tested on Windows Server 2019
 
-- **Framework**: WPF (Windows Presentation Foundation) with .NET Framework 4.8.
-- **Architecture**: MVVM (Model-View-ViewModel) for a clean separation of concerns.
-- **Dependency Injection**: Uses `Microsoft.Extensions.DependencyInjection` for managing services.
-- **UI Toolkit**: Material Design in XAML for a modern and responsive user interface.
-- **Version Detection**: Multiple detection methods including server path parsing, filename analysis, and file content inspection.
+## System Requirements
 
-## Getting Started
+### Minimum Requirements
+- Windows 10/11 or Windows Server 2019
+- .NET Framework 4.8
+- PowerShell 5.1 or higher
+- 4GB RAM minimum (8GB recommended)
+- Administrator privileges (for initial setup)
+
+### Required Software
+- **Autodesk Revit Server** (for server functionality)
+- **Autodesk Navisworks Manage** (for conversion functionality)
+- RevitServerTool.exe (included with Revit installation)
+- FileToolsTaskRunner.exe (included with Navisworks installation)
+
+## Installation
+
+### Quick Start
+1. Download the latest release from the [Releases](https://github.com/[your-username]/RvtToNavisConverter/releases) page
+2. Extract to your preferred location (e.g., `C:\Program Files\RvtToNavisConverter`)
+3. Run `RvtToNavisConverter.exe` as Administrator for first-time setup
+4. Configure settings (Revit Server IP, tool paths, default directories)
+5. Click "Validate Permissions" to ensure proper access
+
+### Windows Server 2019 Installation
+See `INSTALL_INSTRUCTIONS.txt` in the release package for detailed server installation steps.
+
+## Usage
+
+### Initial Configuration
+1. Click the **Settings** button
+2. Configure:
+   - Revit Server IP address
+   - Revit Server Accelerator IP (optional)
+   - Tool paths (or use "Detect Tools" for automatic detection)
+   - Default download and output directories
+3. Save settings (validates connections automatically)
+
+### Basic Workflow
+1. **Source Selection**: Choose between "Revit Server Files" or "Local Files"
+2. **Navigation**: Browse to desired files/folders
+3. **Selection**: Check files/folders for processing
+4. **Options**: Choose "Download" and/or "Convert" actions
+5. **Process**: Click "Process Selected Files" to begin
+
+### Advanced Features
+
+#### Version Detection
+The application automatically detects Revit file versions from:
+- Server path patterns (e.g., `\Revit Server 2021\`)
+- Filename patterns (e.g., `Model_R21.rvt`)
+- File content analysis
+
+#### Tool Compatibility
+- Pre-process validation ensures file/tool version matching
+- Warning dialogs for incompatible versions
+- Override option for experienced users
+
+## Architecture
+
+### Technology Stack
+- **Framework**: WPF with .NET Framework 4.8
+- **Architecture**: MVVM with Dependency Injection
+- **UI Library**: Material Design in XAML
+- **Data Format**: JSON configuration
+- **External Tools**: PowerShell for tool execution
+
+### Key Components
+- **Services**: Business logic with interface-based design
+- **ViewModels**: MVVM pattern with INotifyPropertyChanged
+- **Validation**: Real-time network and path validation
+- **Logging**: File-based logging with rotation
+
+## Development
 
 ### Prerequisites
+- Visual Studio 2019 or later
+- .NET Framework 4.8 Developer Pack
+- Git for version control
 
-- Windows Operating System
-- .NET Framework 4.8
-- Autodesk Revit Server (for server functionality)
-- Autodesk Navisworks Manage (for conversion functionality)
+### Building from Source
+```bash
+# Clone the repository
+git clone https://github.com/[your-username]/RvtToNavisConverter.git
 
-### Installation
+# Navigate to project directory
+cd RvtToNavisConverter
 
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/BTankut/Revit-Navisworks_Converter.git
-    ```
-2.  Navigate to the project directory:
-    ```bash
-    cd Revit-Navisworks_Converter
-    ```
-3.  Build the project using Visual Studio or the .NET CLI:
-    ```bash
-    dotnet build
-    ```
-4.  Run the application from the output directory:
-    ```bash
-    cd bin/Debug/net48
-    ./RvtToNavisConverter.exe
-    ```
+# Restore NuGet packages and build
+dotnet restore
+dotnet build
 
-### Configuration
+# Run the application
+dotnet run
+```
 
-Before using the application, you must configure the required paths and server information:
+### Project Structure
+```
+RvtToNavisConverter/
+├── Models/          # Data models and interfaces
+├── ViewModels/      # MVVM ViewModels
+├── Views/           # WPF Views (XAML)
+├── Services/        # Business logic services
+├── Helpers/         # Utility classes
+└── Resources/       # Images and resources
+```
 
-1.  Launch the application.
-2.  Click on the **Settings** button.
-3.  Fill in the following fields:
-    -   **Revit Server IP**: The IP address of your Revit Server.
-    -   **Revit Server Accelerator IP**: The IP or hostname of the Revit Server Accelerator.
-    -   **Tool Versions**: Click "Detect All Tools" to automatically find installed Revit/Navisworks versions, or use individual detect buttons.
-    -   **Default Download Path**: The folder where Revit files will be downloaded.
-    -   **Default NWC Path**: The folder for individual `.nwc` files.
-    -   **Default NWD Path**: The folder for consolidated `.nwd` output files.
-4.  Click **Save**.
+## Configuration
 
-## How to Use
+### appsettings.json
+```json
+{
+  "AppSettings": {
+    "RevitServerIp": "192.168.1.100",
+    "RevitServerAccelerator": "accelerator.local",
+    "RevitServerToolPath": "C:\\Program Files\\Autodesk\\...",
+    "NavisworksToolPath": "C:\\Program Files\\Autodesk\\...",
+    "DefaultDownloadPath": "C:\\RevitDownloads",
+    "DefaultNwcPath": "C:\\NavisworksOutput\\NWC",
+    "DefaultNwdPath": "C:\\NavisworksOutput\\NWD"
+  }
+}
+```
 
-1.  **Connect to Server**: Click the **Connect** button to browse your configured Revit Server. File versions will be automatically detected from server paths.
-2.  **Browse Local Files**: Click the **Browse Local** button to open a folder dialog and select a local directory containing `.rvt` files.
-3.  **Select Files**:
-    -   Use the **Download** checkbox to select files to be downloaded from the server.
-    -   Use the **Convert** checkbox to select files for Navisworks conversion. For local files, only the convert option is available.
-    -   View the **Version** column to see detected Revit file versions.
-4.  **Start Processing**: Click the **Start Processing** button to begin the download and/or conversion process. The application will validate version compatibility before processing.
-5.  **Monitor Progress**: A progress window will appear, showing the status of each file operation.
-6.  **View Logs**: For detailed PowerShell command logs, click the **Monitor** button.
+## Troubleshooting
+
+### Common Issues
+
+#### Cannot Connect to Revit Server
+- Verify network connectivity
+- Check Windows Firewall settings
+- Ensure Revit Server service is running
+- Validate IP address in settings
+
+#### Tool Validation Fails
+- Verify Autodesk software installation
+- Check file permissions on tool executables
+- Use "Detect Tools" feature
+- Run as Administrator if needed
+
+#### Permission Errors
+- Run application as Administrator for initial setup
+- Check folder permissions for output directories
+- Review permission validation dialog
+
+### Log Files
+Application logs are stored at:
+- `%LocalAppData%\RvtToNavisConverter\app_log.txt`
 
 ## Version History
 
-- **v1.8.0**: Added Revit file version detection and compatibility checking
-- **v1.7.0**: Added automatic tool detection for multiple Revit/Navisworks versions
-- **v1.6.0**: Added permission validation system and improved settings UX
-- **v1.5.0**: Implemented indeterminate checkbox state for parent folders
-- **v1.4.0**: Fixed folder selection clearing issue
-- **v1.3.0**: Added Clear All Selections functionality
+- **v2.0.0** - Production-ready release with Windows Server 2019 support
+- **v1.8.0** - Added Revit file version detection and compatibility checking
+- **v1.7.0** - Automatic tool detection for multiple versions
+- **v1.6.0** - Permission validation system
+- **v1.5.0** - Hierarchical folder selection
+- **v1.0.0** - Initial release
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with [Material Design in XAML](http://materialdesigninxaml.net/)
+- Uses Microsoft.Extensions.DependencyInjection for IoC
+- PowerShell integration for external tool execution
+
+## Author
+
+**Baris Tankut** - *Initial work* - [GitHub Profile](https://github.com/[your-username])
+
+## Support
+
+For issues, questions, or contributions:
+- Open an issue on [GitHub Issues](https://github.com/[your-username]/RvtToNavisConverter/issues)
+- Check existing issues before creating new ones
+- Include log files when reporting bugs
+
+---
+
+© 2025 Baris Tankut. All rights reserved.
