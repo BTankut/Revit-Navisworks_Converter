@@ -20,7 +20,9 @@ namespace RvtToNavisConverter.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                LogEntries += entry + Environment.NewLine;
+                // Add timestamp to each log entry
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                LogEntries += $"[{timestamp}] {entry}{Environment.NewLine}";
             });
         }
     }

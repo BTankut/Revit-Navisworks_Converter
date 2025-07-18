@@ -7,11 +7,17 @@
         mc:Ignorable="d"
         Title="PowerShell Monitor" Height="450" Width="800">
     <Grid>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <TextBlock Text="{Binding LogEntries, Mode=OneWay}" 
-                       FontFamily="Consolas"
-                       TextWrapping="Wrap"
-                       Margin="5"/>
-        </ScrollViewer>
+        <TextBox Name="LogTextBox"
+                 Text="{Binding LogEntries, Mode=OneWay}" 
+                 FontFamily="Consolas"
+                 TextWrapping="Wrap"
+                 IsReadOnly="True"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Disabled"
+                 BorderThickness="0"
+                 Background="Transparent"
+                 Margin="5"
+                 VerticalAlignment="Top"
+                 TextChanged="LogTextBox_TextChanged"/>
     </Grid>
 </Window>

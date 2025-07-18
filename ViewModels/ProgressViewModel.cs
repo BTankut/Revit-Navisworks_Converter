@@ -63,7 +63,8 @@ namespace RvtToNavisConverter.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                LogMessages += message + Environment.NewLine;
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                LogMessages += $"[{timestamp}] {message}{Environment.NewLine}";
             });
         }
 

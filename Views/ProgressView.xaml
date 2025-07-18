@@ -21,7 +21,10 @@
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
             <TextBox Text="{Binding LogMessages, Mode=OneWay}" 
-                     IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"/>
+                     IsReadOnly="True" 
+                     TextWrapping="Wrap" 
+                     BorderThickness="0"
+                     VerticalAlignment="Top"/>
         </ScrollViewer>
     </Grid>
 </Window>

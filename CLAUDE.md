@@ -162,6 +162,13 @@ dotnet build --configuration Release
 - `@modelcontextprotocol/server-github` - GitHub server for MCP
 
 ### Version History Pattern
+- **v2.3.0**: Enhanced logging with timestamps and improved UI text alignment
+  - Added timestamps to PowerShell monitor logs for better tracking
+  - Added timestamps to progress window logs during file processing
+  - Fixed vertical text alignment in PowerShell monitor (now top-aligned)
+  - Fixed vertical text alignment in progress window (now top-aligned)
+  - Made PowerShell monitor text selectable while maintaining word wrap
+  - Improved overall logging visibility and usability
 - **v2.2.0**: Fixed critical folder selection processing bugs
   - Fixed issue where deselected files within a selected folder were still being processed
   - Fixed "Start Processing" button not working correctly across different directories
