@@ -126,7 +126,7 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand ToggleConversionCommand { get; }
 
         private CancellationTokenSource? _cancellationTokenSource;
-        private readonly Dictionary<string, IFileSystemItem> _selectedItems = new Dictionary<string, IFileSystemItem>();
+        // Removed _selectedItems - all selections are now managed through SelectionManager
 
         public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, IRevitFileVersionService revitFileVersionService, IHardwareIdService hardwareIdService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper, SelectionManager selectionManager)
         {
@@ -173,11 +173,24 @@ NavigateToFolderCommand = new RelayCommand(
     item => item is IFileSystemItem fsItem && fsItem.IsDirectory && !IsLoading
 );
 StartProcessingCommand = new RelayCommand(
-    async _ => await ProcessFilesAsync(), 
-    _ => FileSystemItems.Any(f => 
-        (f.IsSelectedForDownload ?? false) || 
-        (f.IsSelectedForConversion ?? false)
-    ) && !IsLoading
+    async _ => 
+    {
+        FileLogger.Log("StartProcessingCommand.Execute called - attempting to start processing");
+        await ProcessFilesAsync();
+    }, 
+    _ => 
+    {
+        var selections = _selectionManager.GetAllSelections();
+        var hasDownloadSelection = selections.Any(kvp => kvp.Value.IsSelectedForDownload == true);
+        var hasConversionSelection = selections.Any(kvp => kvp.Value.IsSelectedForConversion == true);
+        var isNotLoading = !IsLoading;
+        
+        FileLogger.Log($"StartProcessingCommand.CanExecute: Total selections={selections.Count}, " +
+                      $"HasDownload={hasDownloadSelection}, HasConversion={hasConversionSelection}, " +
+                      $"IsLoading={IsLoading}, Result={((hasDownloadSelection || hasConversionSelection) && isNotLoading)}");
+        
+        return (hasDownloadSelection || hasConversionSelection) && isNotLoading;
+    }
 );
             OpenSettingsCommand = new RelayCommand(_ => OpenSettings(), _ => !IsLoading);
             OpenMonitorCommand = new RelayCommand(_ => OpenMonitor(), _ => !IsLoading);
@@ -317,11 +330,18 @@ ToggleDownloadCommand = new RelayCommand(
             {
                 FileLogger.Log($"UI öğesi bulunamadı (bu normal, üst klasör olabilir): {e.Path}");
             }
+            
+            // Update command states when selection changes
+            FileLogger.Log("Calling CommandManager.InvalidateRequerySuggested() to update command states");
+            CommandManager.InvalidateRequerySuggested();
         }
 
         public void HandleSelectionChange(IFileSystemItem item, bool isDownload, bool? newValue)
         {
             if (item == null) return;
+            
+            FileLogger.Log($"HandleSelectionChange called: Path={item.Path}, IsDirectory={item.IsDirectory}, " +
+                          $"IsDownload={isDownload}, NewValue={newValue}");
 
             if (item.IsDirectory)
             {
@@ -367,7 +387,6 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
         private void ClearAllSelections()
         {
             _selectionManager.ClearAllSelections();
-            _selectedItems.Clear();
         }
 
         private void OpenSettings()
@@ -428,8 +447,7 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
         {
             if (string.IsNullOrEmpty(path)) return;
 
-            // Save current selections
-            SaveCurrentSelections();
+            // No need to save selections - SelectionManager handles all selections
 
             IsLoading = true;
             StatusMessage = $"Loading contents of {path}...";
@@ -458,7 +476,7 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
             }
             
             // Restore selections only if there are any saved selections
-            if (_selectedItems.Count > 0 || _selectionManager.GetAllSelections().Count > 0)
+            if (_selectionManager.GetAllSelections().Count > 0)
             {
                 RestoreSelections(items);
             }
@@ -605,27 +623,7 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
             }
         }
 
-        private void SaveCurrentSelections()
-        {
-            // Mevcut tüm seçimleri kaydet - sadece gerçekten seçili olanları
-            foreach (var item in FileSystemItems)
-            {
-                // Sadece seçili öğeleri kaydet
-                if (item.IsSelectedForDownload == true || item.IsSelectedForConversion == true)
-                {
-                    _selectedItems[item.Path] = item;
-                }
-                else
-                {
-                    // Seçili değilse dictionary'den kaldır
-                    _selectedItems.Remove(item.Path);
-                }
-            }
-            
-            // Ayrıca SelectionManager'daki tüm seçimleri de kaydet
-            var allSelections = _selectionManager.GetAllSelections();
-            FileLogger.Log($"SaveCurrentSelections: {allSelections.Count} seçim kaydedildi, _selectedItems: {_selectedItems.Count}");
-        }
+        // SaveCurrentSelections method removed - all selections managed through SelectionManager
 
         private void RestoreSelections(IEnumerable<IFileSystemItem> items)
         {
@@ -679,85 +677,196 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
 
         private async Task ProcessFilesAsync()
         {
-            // Save current selections before processing
-            SaveCurrentSelections();
-
+            try
+            {
+                FileLogger.Log("=== ProcessFilesAsync START ===");
+            
             var filesToDownload = new List<FileItem>();
             var filesToConvert = new List<FileItem>();
 
-// Use SelectionManager to get all selections
-var allSelections = _selectionManager.GetAllSelections();
-var folderMarkers = allSelections.Keys
-    .Where(k => k.EndsWith("\\*"))
-    .ToList();
-
-// Process file selections first
-foreach (var item in _selectedItems.Values)
-{
-    if (item is FileItem file)
-    {
-        if (file.IsSelectedForDownload == true)
-        {
-            filesToDownload.Add(file);
-        }
-        if (file.IsSelectedForConversion == true)
-        {
-            filesToConvert.Add(file);
-        }
-    }
-}
-
-// Process folder markers (these represent fully selected folders)
-foreach (var marker in folderMarkers)
-{
-    var folderPath = marker.Substring(0, marker.Length - 2); // Remove the \* suffix
-    var selectionState = allSelections[marker];
-    
-    if (selectionState.IsSelectedForDownload == true || selectionState.IsSelectedForConversion == true)
-    {
-        var isLocal = _selectedItems.Values
-            .OfType<IFileSystemItem>()
-            .FirstOrDefault(i => i.Path.Equals(folderPath, StringComparison.OrdinalIgnoreCase))?.IsLocal ?? false;
+            // Get all selections from SelectionManager
+            var allSelections = _selectionManager.GetAllSelections();
+            FileLogger.Log($"Total selections: {allSelections.Count}");
             
-        var allFiles = await GetAllFilesRecursive(folderPath, isLocal);
-        
-        if (selectionState.IsSelectedForDownload == true)
-        {
-            filesToDownload.AddRange(allFiles);
-        }
-        if (selectionState.IsSelectedForConversion == true)
-        {
-            filesToConvert.AddRange(allFiles);
-        }
-    }
-}
-
-// Process folder selections that aren't fully selected
-foreach (var item in _selectedItems.Values)
-{
-    if (item is FolderItem folder)
-    {
-        // Skip folders that are already processed via markers
-        if (folderMarkers.Any(m => m.StartsWith(folder.Path, StringComparison.OrdinalIgnoreCase)))
-            continue;
-            
-        if (folder.IsSelectedForDownload == true || folder.IsSelectedForConversion == true)
-        {
-            var allFiles = await GetAllFilesRecursive(folder.Path, item.IsLocal);
-            
-            if (folder.IsSelectedForDownload == true)
+            foreach (var kvp in allSelections)
             {
-                filesToDownload.AddRange(allFiles);
+                FileLogger.Log($"  {kvp.Key}: Download={kvp.Value.IsSelectedForDownload}, Conversion={kvp.Value.IsSelectedForConversion}");
             }
-            if (folder.IsSelectedForConversion == true)
+            
+            // Process folder markers first (these represent fully selected folders)
+            var folderMarkers = allSelections.Where(kvp => kvp.Key.EndsWith("\\*")).ToList();
+            FileLogger.Log($"Found {folderMarkers.Count} folder markers");
+            
+            foreach (var marker in folderMarkers)
             {
-                filesToConvert.AddRange(allFiles);
+                var folderPath = marker.Key.Substring(0, marker.Key.Length - 2); // Remove "\*"
+                var selectionState = marker.Value;
+                
+                FileLogger.Log($"Processing folder marker: {folderPath}, Download={selectionState.IsSelectedForDownload}, Conversion={selectionState.IsSelectedForConversion}");
+                
+                // Determine if this is a local or server path
+                var isLocal = !folderPath.StartsWith("\\\\");
+                
+                // When a folder marker exists, we need to check individual file overrides
+                if (selectionState.IsSelectedForDownload == true)
+                {
+                    var allFiles = await GetAllFilesRecursive(folderPath, isLocal);
+                    FileLogger.Log($"  Folder marker indicates download, checking {allFiles.Count} files for individual overrides");
+                    
+                    // Check each file to see if it has been individually deselected
+                    foreach (var file in allFiles)
+                    {
+                        var fileSelection = _selectionManager.GetSelection(file.Path, true);
+                        FileLogger.Log($"    File: {file.Path}, Individual selection: {fileSelection}");
+                        
+                        // If file has explicit false selection, skip it
+                        if (fileSelection == false)
+                        {
+                            FileLogger.Log($"      -> File explicitly deselected, skipping");
+                            continue;
+                        }
+                        
+                        // Otherwise, include it (null or true means it inherits from folder)
+                        FileLogger.Log($"      -> Including file for download");
+                        filesToDownload.Add(file);
+                    }
+                }
+                
+                if (selectionState.IsSelectedForConversion == true)
+                {
+                    var allFiles = await GetAllFilesRecursive(folderPath, isLocal);
+                    FileLogger.Log($"  Folder marker indicates conversion, checking {allFiles.Count} files for individual overrides");
+                    
+                    // Check each file to see if it has been individually deselected
+                    foreach (var file in allFiles)
+                    {
+                        var fileSelection = _selectionManager.GetSelection(file.Path, false);
+                        FileLogger.Log($"    File: {file.Path}, Individual selection: {fileSelection}");
+                        
+                        // If file has explicit false selection, skip it
+                        if (fileSelection == false)
+                        {
+                            FileLogger.Log($"      -> File explicitly deselected, skipping");
+                            continue;
+                        }
+                        
+                        // Otherwise, include it (null or true means it inherits from folder)
+                        FileLogger.Log($"      -> Including file for conversion");
+                        filesToConvert.Add(file);
+                    }
+                }
             }
-        }
-    }
-}
+            
+            // Process individual file selections (not folder markers)
+            var individualSelections = allSelections.Where(kvp => !kvp.Key.EndsWith("\\*")).ToList();
+            FileLogger.Log($"Processing {individualSelections.Count} individual selections");
+            
+            foreach (var kvp in individualSelections)
+            {
+                var path = kvp.Key;
+                var selectionState = kvp.Value;
+                
+                FileLogger.Log($"  Checking path: {path}, Download={selectionState.IsSelectedForDownload}, Conversion={selectionState.IsSelectedForConversion}");
+                
+                // Skip if neither download nor conversion is selected
+                if (selectionState.IsSelectedForDownload != true && selectionState.IsSelectedForConversion != true)
+                {
+                    FileLogger.Log($"    -> Skipping, not selected");
+                    continue;
+                }
+                
+                // Check if this is a file
+                if (path.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase))
+                {
+                    FileLogger.Log($"    -> Processing as file");
+                    
+                    // Check if this file is already covered by a folder marker
+                    bool coveredByFolderMarker = false;
+                    foreach (var marker in folderMarkers)
+                    {
+                        var folderPath = marker.Key.Substring(0, marker.Key.Length - 2);
+                        if (path.StartsWith(folderPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            coveredByFolderMarker = true;
+                            FileLogger.Log($"    -> File already covered by folder marker: {marker.Key}");
+                            break;
+                        }
+                    }
+                    
+                    if (!coveredByFolderMarker)
+                    {
+                        // Determine if this is a local or server file
+                        var isLocal = !path.StartsWith("\\\\");
+                        
+                        // Create FileItem for this file
+                        var fileItem = new FileItem 
+                        { 
+                            Path = path, 
+                            Name = Path.GetFileName(path), 
+                            IsLocal = isLocal 
+                        };
+                        
+                        if (selectionState.IsSelectedForDownload == true)
+                        {
+                            FileLogger.Log($"    -> Adding to download list");
+                            filesToDownload.Add(fileItem);
+                        }
+                        
+                        if (selectionState.IsSelectedForConversion == true)
+                        {
+                            FileLogger.Log($"    -> Adding to conversion list");
+                            filesToConvert.Add(fileItem);
+                        }
+                    }
+                }
+                else
+                {
+                    // This might be a folder with indeterminate state
+                    FileLogger.Log($"    -> Checking if this is a folder with partial selection");
+                    
+                    // Try to get directory contents to see if it's a folder
+                    var isLocal = !path.StartsWith("\\\\");
+                    try
+                    {
+                        var items = isLocal 
+                            ? await _localFileService.GetDirectoryContentsAsync(path, CancellationToken.None)
+                            : await _revitServerService.GetDirectoryContentsAsync(path, CancellationToken.None);
+                        
+                        if (items != null && items.Any())
+                        {
+                            FileLogger.Log($"    -> This is a folder with {items.Count()} items");
+                            
+                            // This is a folder - check for partial selection
+                            if (selectionState.IsSelectedForDownload == null)
+                            {
+                                // Indeterminate - get only selected files
+                                var files = await GetSelectedFilesRecursive(path, isLocal, true, false);
+                                FileLogger.Log($"    -> Folder partially selected for download, found {files.Count} selected files");
+                                filesToDownload.AddRange(files);
+                            }
+                            
+                            if (selectionState.IsSelectedForConversion == null)
+                            {
+                                // Indeterminate - get only selected files
+                                var files = await GetSelectedFilesRecursive(path, isLocal, false, true);
+                                FileLogger.Log($"    -> Folder partially selected for conversion, found {files.Count} selected files");
+                                filesToConvert.AddRange(files);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        FileLogger.Log($"    -> Not a valid folder path");
+                    }
+                }
+            }
 
             var filesToProcess = filesToDownload.Union(filesToConvert).Distinct().ToList();
+            
+            FileLogger.Log($"=== Final file counts ===");
+            FileLogger.Log($"Files to download: {filesToDownload.Count}");
+            FileLogger.Log($"Files to convert: {filesToConvert.Count}");
+            FileLogger.Log($"Total unique files to process: {filesToProcess.Count}");
 
             if (!filesToProcess.Any())
             {
@@ -925,6 +1034,14 @@ foreach (var item in _selectedItems.Values)
                 }
                 // progressWindow.Close(); // Optional: close window when done
             }
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Log($"CRITICAL ERROR in ProcessFilesAsync: {ex.GetType().Name}: {ex.Message}");
+                FileLogger.Log($"Stack trace: {ex.StackTrace}");
+                MessageBox.Show($"An error occurred while starting processing:\n\n{ex.Message}", 
+                               "Processing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void UpdateFileStatus(FileItem file, string status)
@@ -952,6 +1069,46 @@ foreach (var item in _selectedItems.Values)
                 }
             }
             return allFiles;
+        }
+
+        private async Task<List<FileItem>> GetSelectedFilesRecursive(string path, bool isLocal, bool checkDownload, bool checkConversion)
+        {
+            FileLogger.Log($"GetSelectedFilesRecursive: path={path}, isLocal={isLocal}, checkDownload={checkDownload}, checkConversion={checkConversion}");
+            
+            var selectedFiles = new List<FileItem>();
+            var items = isLocal 
+                ? await _localFileService.GetDirectoryContentsAsync(path, CancellationToken.None)
+                : await _revitServerService.GetDirectoryContentsAsync(path, CancellationToken.None);
+
+            foreach (var item in items)
+            {
+                if (item is FileItem file)
+                {
+                    bool shouldInclude = false;
+                    var downloadSelection = _selectionManager.GetSelection(file.Path, true);
+                    var conversionSelection = _selectionManager.GetSelection(file.Path, false);
+                    
+                    FileLogger.Log($"  File: {file.Path}, downloadSelection={downloadSelection}, conversionSelection={conversionSelection}");
+                    
+                    if (checkDownload && downloadSelection == true)
+                        shouldInclude = true;
+                    if (checkConversion && conversionSelection == true)
+                        shouldInclude = true;
+                    
+                    if (shouldInclude)
+                    {
+                        FileLogger.Log($"    -> Including file: {file.Path}");
+                        selectedFiles.Add(file);
+                    }
+                }
+                else if (item is FolderItem folder)
+                {
+                    selectedFiles.AddRange(await GetSelectedFilesRecursive(folder.Path, isLocal, checkDownload, checkConversion));
+                }
+            }
+            
+            FileLogger.Log($"GetSelectedFilesRecursive returning {selectedFiles.Count} files");
+            return selectedFiles;
         }
     }
 }

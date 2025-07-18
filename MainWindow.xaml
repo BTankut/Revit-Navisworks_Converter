@@ -9,7 +9,7 @@
         xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
-        Title="Revit to Navisworks Converter v2.1.0 © 2025 Baris Tankut" Height="600" Width="900"
+        Title="Revit to Navisworks Converter v2.2.0 © 2025 Baris Tankut" Height="600" Width="900"
         Loaded="Window_Loaded">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -42,7 +42,7 @@
                 <materialDesign:PackIcon Kind="ArrowUp" />
             </Button>
             <Separator/>
-            <Button Command="{Binding StartProcessingCommand}" Content="Start Processing" Background="DodgerBlue"/>
+            <Button x:Name="StartProcessingButton" Command="{Binding StartProcessingCommand}" Content="Start Processing" Background="DodgerBlue" Click="StartProcessingButton_Click" ToolTip="Process selected files"/>
             <Separator/>
             <Button Command="{Binding OpenSettingsCommand}" Content="Settings"/>
             <Button Command="{Binding OpenMonitorCommand}" ToolTip="Open PowerShell Monitor">

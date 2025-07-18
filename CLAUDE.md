@@ -162,6 +162,11 @@ dotnet build --configuration Release
 - `@modelcontextprotocol/server-github` - GitHub server for MCP
 
 ### Version History Pattern
+- **v2.2.0**: Fixed critical folder selection processing bugs
+  - Fixed issue where deselected files within a selected folder were still being processed
+  - Fixed "Start Processing" button not working correctly across different directories
+  - Improved folder marker handling to respect individual file selection overrides
+  - Enhanced selection state management and processing logic
 - **v2.1.0**: RSA-based licensing system with Hardware ID protection
   - Secure license generation with asymmetric encryption
   - Hardware ID based on MAC address, CPU ID, and volume serial

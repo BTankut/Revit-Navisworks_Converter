@@ -108,5 +108,30 @@ namespace RvtToNavisConverter
                 }
             }
         }
+
+        private async void StartProcessingButton_Click(object sender, RoutedEventArgs e)
+        {
+            FileLogger.Log("StartProcessingButton_Click fired - Direct button click detected");
+            
+            if (DataContext is MainViewModel vm)
+            {
+                // Check if the command can execute
+                if (vm.StartProcessingCommand.CanExecute(null))
+                {
+                    FileLogger.Log("StartProcessingCommand.CanExecute returned true - executing command");
+                    vm.StartProcessingCommand.Execute(null);
+                }
+                else
+                {
+                    FileLogger.Log("StartProcessingCommand.CanExecute returned false - button should be disabled");
+                    MessageBox.Show("No files are selected for download or conversion.\n\nPlease select at least one file by checking the Download or Convert checkboxes.", 
+                                   "No Files Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            else
+            {
+                FileLogger.Log("ERROR: DataContext is not MainViewModel");
+            }
+        }
     }
 }
