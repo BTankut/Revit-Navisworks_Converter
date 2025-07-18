@@ -261,3 +261,31 @@ dotnet build --configuration Release
 - Monitor file system access patterns for large directory structures
 - Check network connectivity for server operations
 - Review PowerShell execution logs for external tool performance
+
+## Current Known Issues & Recent Fixes
+
+### Recently Fixed (v2.4.0)
+- **Critical Bug**: Files that failed to download were being sent to conversion process
+  - Solution: Added file existence validation before conversion
+  - Enhanced error logging for download failures
+
+### Critical Components to Review
+1. **SelectionManager**: Handles complex folder/file selection with indeterminate states
+   - Folder markers (paths ending with `\*`) indicate fully selected folders
+   - Individual file selections can override folder markers
+   
+2. **ProcessFilesAsync in MainViewModel**: Core processing logic
+   - Handles both download and conversion phases
+   - Must respect individual file selection states within folders
+   
+3. **Download Verification**: FileDownloadService checks file existence after download
+   - PowerShell output may show success even if file doesn't exist
+   - Always verify with File.Exists()
+
+### Testing Checklist
+- [ ] Test folder selection with partial file deselection
+- [ ] Verify failed downloads don't proceed to conversion
+- [ ] Check PowerShell monitor timestamps are displayed correctly
+- [ ] Ensure progress window shows timestamps and is top-aligned
+- [ ] Validate file version detection for Revit 2021 files
+- [ ] Test license validation (Release builds only)
