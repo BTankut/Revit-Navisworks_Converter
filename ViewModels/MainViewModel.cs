@@ -959,8 +959,16 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                             }
                             else
                             {
-                                UpdateFileStatus(file, "Error during download");
-                                _progressViewModel.AddLog($"{file.Name} - Download Error");
+                                UpdateFileStatus(file, "Download failed");
+                                _progressViewModel.AddLog($"{file.Name} - Download failed");
+                                FileLogger.LogError($"Download failed for file: {file.Name} from path: {file.Path}");
+                                
+                                // Check if the file exists to provide more specific error info
+                                var expectedPath = System.IO.Path.Combine(settings.DefaultDownloadPath, file.Name);
+                                if (!System.IO.File.Exists(expectedPath))
+                                {
+                                    FileLogger.LogError($"File not found after download attempt: {expectedPath}");
+                                }
                             }
                             filesCompleted++;
                             var percentage = (int)((double)filesCompleted / totalFiles * 100);
@@ -975,8 +983,20 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                     }
 
                     // --- Conversion Phase ---
+                    // Only convert files that:
+                    // 1. Were NOT selected for download (local files or server files to convert directly)
+                    // 2. OR were successfully downloaded
                     var finalConversionList = filesToConvert
-                        .Where(f => !(f.IsSelectedForDownload == true) || successfullyDownloadedFiles.Contains(f))
+                        .Where(f => 
+                        {
+                            // If file was selected for download, it must be in successfullyDownloadedFiles
+                            if (f.IsSelectedForDownload == true)
+                            {
+                                return successfullyDownloadedFiles.Contains(f);
+                            }
+                            // If not selected for download, include it for conversion
+                            return true;
+                        })
                         .ToList();
 
                     if (finalConversionList.Any())

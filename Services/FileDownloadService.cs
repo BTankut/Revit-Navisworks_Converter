@@ -42,7 +42,22 @@ namespace RvtToNavisConverter.Services
             FileLogger.Log($"PowerShell script result: {result}");
 
             // Success is determined by whether the file was created.
-            return File.Exists(destinationPath);
+            var fileExists = File.Exists(destinationPath);
+            
+            if (!fileExists)
+            {
+                FileLogger.LogError($"Download verification failed - file not found at: {destinationPath}");
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    FileLogger.LogError($"PowerShell output: {result}");
+                }
+            }
+            else
+            {
+                FileLogger.Log($"Download verified - file exists at: {destinationPath}");
+            }
+            
+            return fileExists;
         }
     }
 }

@@ -39,7 +39,8 @@
       "Bash(cmd /c:*)",
       "Bash(LicenseGenerator.exe)",
       "Bash(csc:*)",
-      "Bash(GenerateRsaKeys.exe)"
+      "Bash(GenerateRsaKeys.exe)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

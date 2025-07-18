@@ -35,7 +35,29 @@ namespace RvtToNavisConverter.Services
 
             // The Navisworks utility expects the path to the .rvt container folder for server files, 
             // and the direct file path for local files.
-            var filePaths = task.FilesToProcess.Select(f => f.IsLocal ? f.Path : Path.Combine(settings.DefaultDownloadPath, f.Name));
+            var filePaths = task.FilesToProcess.Select(f => f.IsLocal ? f.Path : Path.Combine(settings.DefaultDownloadPath, f.Name)).ToList();
+            
+            // Validate that all files exist before attempting conversion
+            var missingFiles = new List<string>();
+            foreach (var filePath in filePaths)
+            {
+                if (!File.Exists(filePath))
+                {
+                    missingFiles.Add(filePath);
+                    FileLogger.LogError($"File not found for conversion: {filePath}");
+                }
+            }
+            
+            if (missingFiles.Any())
+            {
+                FileLogger.LogError($"Conversion aborted: {missingFiles.Count} files are missing");
+                foreach (var missing in missingFiles)
+                {
+                    FileLogger.LogError($"  Missing: {missing}");
+                }
+                return false;
+            }
+            
             File.WriteAllLines(tempFileListPath, filePaths, Encoding.UTF8);
 
             var arguments = new List<string>

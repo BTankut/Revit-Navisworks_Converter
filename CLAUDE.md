@@ -162,6 +162,13 @@ dotnet build --configuration Release
 - `@modelcontextprotocol/server-github` - GitHub server for MCP
 
 ### Version History Pattern
+- **v2.4.0**: Fixed critical bug with failed downloads being sent to conversion
+  - Fixed issue where files that failed to download were still being processed for conversion
+  - Added file existence validation before conversion to prevent errors
+  - Improved error logging for failed downloads with detailed file paths
+  - Enhanced download verification with explicit file existence checks
+  - Added PowerShell output logging for failed download diagnostics
+  - Conversion now properly aborts when required files are missing
 - **v2.3.0**: Enhanced logging with timestamps and improved UI text alignment
   - Added timestamps to PowerShell monitor logs for better tracking
   - Added timestamps to progress window logs during file processing
