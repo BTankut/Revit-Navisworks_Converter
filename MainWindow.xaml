@@ -9,7 +9,7 @@
         xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
-        Title="Revit to Navisworks Converter v2.0.0 © 2025 Baris Tankut" Height="600" Width="900"
+        Title="Revit to Navisworks Converter v2.1.0 © 2025 Baris Tankut" Height="600" Width="900"
         Loaded="Window_Loaded">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -53,6 +53,15 @@
                 <materialDesign:PackIcon Kind="DeleteSweep" />
             </Button>
             <Button Command="{Binding CancelCommand}" Content="Cancel" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Background="IndianRed"/>
+            
+            <!-- About Button -->
+            <Separator/>
+            <Button Command="{Binding OpenAboutCommand}" ToolTip="About">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Information" Margin="0,0,5,0"/>
+                    <TextBlock Text="About"/>
+                </StackPanel>
+            </Button>
         </ToolBar>
 
         <TextBox Grid.Row="1" Text="{Binding CurrentPath}" IsReadOnly="True" Margin="5" VerticalAlignment="Center"/>

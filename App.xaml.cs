@@ -12,6 +12,7 @@ namespace RvtToNavisConverter
     public partial class App : Application
     {
         private ServiceProvider? _serviceProvider;
+        public IServiceProvider? Services => _serviceProvider;
 
         public App()
         {
@@ -37,6 +38,12 @@ namespace RvtToNavisConverter
             services.AddSingleton<IToolDetectionService, ToolDetectionService>();
             services.AddSingleton<IRevitFileVersionService, RevitFileVersionService>();
             services.AddSingleton<SelectionManager>();
+            
+            // License Services
+            services.AddSingleton<IHardwareIdService, HardwareIdService>();
+            services.AddSingleton<ICryptoService, CryptoService>();
+            services.AddSingleton<IRsaCryptoService, RsaCryptoService>();
+            services.AddSingleton<ILicenseService, LicenseService>();
 
             // ViewModels
             services.AddSingleton<MainViewModel>();
@@ -59,6 +66,44 @@ namespace RvtToNavisConverter
 
             try
             {
+#if !DEBUG
+                // Validate license only in Release mode
+                var licenseService = _serviceProvider!.GetService<ILicenseService>();
+                if (licenseService != null)
+                {
+                    // Check for and import any license files first
+                    licenseService.CheckAndImportLicenseFile();
+                    
+                    var validationResult = licenseService.ValidateLicense();
+                    
+                    // If no license found, create trial
+                    if (validationResult.Status == Models.LicenseStatus.NotFound)
+                    {
+                        validationResult = licenseService.CreateTrialLicense();
+                    }
+                    
+                    // If license is expired, invalid, or tampered
+                    if (validationResult.Status != Models.LicenseStatus.Valid)
+                    {
+                        var licenseDialog = new LicenseDialog(validationResult.HardwareId ?? "Unknown");
+                        licenseDialog.ShowDialog();
+                        Current.Shutdown();
+                        return;
+                    }
+                    
+                    // Store license validation result for use in MainViewModel
+                    Current.Properties["LicenseValidation"] = validationResult;
+                }
+#else
+                // In Debug mode, create a dummy validation result with full trial
+                Current.Properties["LicenseValidation"] = new Models.LicenseValidationResult
+                {
+                    Status = Models.LicenseStatus.Valid,
+                    DaysRemaining = 30,
+                    Message = "Debug Mode - No License Check"
+                };
+#endif
+
                 var mainWindow = _serviceProvider!.GetService<MainWindow>();
                 if (mainWindow != null)
                 {

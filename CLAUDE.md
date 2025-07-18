@@ -61,6 +61,12 @@ This is a WPF desktop application built with .NET Framework 4.8 that facilitates
 - `IRevitFileVersionService/RevitFileVersionService` - Revit file version detection and compatibility
 - `SelectionManager` - Hierarchical file selection state management
 
+**Security Services:**
+- `ILicenseService/LicenseService` - License validation and management
+- `IHardwareIdService/HardwareIdService` - Hardware identifier generation
+- `ICryptoService/CryptoService` - AES encryption for local storage
+- `IRsaCryptoService/RsaCryptoService` - RSA signature verification
+
 #### `/Helpers/` - Utility Classes
 - `PowerShellHelper.cs` - PowerShell script execution with logging
 - `FileHelper.cs` - File system utility operations
@@ -156,6 +162,12 @@ dotnet build --configuration Release
 - `@modelcontextprotocol/server-github` - GitHub server for MCP
 
 ### Version History Pattern
+- **v2.1.0**: RSA-based licensing system with Hardware ID protection
+  - Secure license generation with asymmetric encryption
+  - Hardware ID based on MAC address, CPU ID, and volume serial
+  - About dialog with copyable Hardware ID
+  - Automatic license file import on startup
+  - Support for both Trial and Full licenses
 - **v2.0.0**: Production-ready release with Windows Server 2019 support
 - **v1.8.0**: Revit file version detection and compatibility checking
 - **v1.7.0**: Automatic tool detection for multiple Revit/Navisworks versions
@@ -182,6 +194,11 @@ dotnet build --configuration Release
 - **Permission Validation**: Startup checks for required file system permissions
 - **Input Validation**: Path and IP address validation before execution
 - **External Tool Safety**: PowerShell execution with controlled parameter passing
+- **Licensing System**: RSA-2048 asymmetric encryption for license signatures
+  - Hardware ID generation from system identifiers
+  - License validation only in Release builds
+  - Automatic import of `.lic` files from app directory or `%AppData%`
+  - Secure storage in `%LocalAppData%` with registry backup
 
 ## Working with This Codebase
 

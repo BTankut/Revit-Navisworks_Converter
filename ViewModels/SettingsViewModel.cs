@@ -6,7 +6,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RvtToNavisConverter.ViewModels
 {
@@ -111,6 +113,7 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand ValidateDefaultDownloadPathCommand { get; }
         public ICommand ValidateDefaultNwcPathCommand { get; }
         public ICommand ValidateDefaultNwdPathCommand { get; }
+        public ICommand ShowHardwareIdCommand { get; }
 
 
         public SettingsViewModel(ISettingsService settingsService, IValidationService validationService, IToolDetectionService toolDetectionService)
@@ -137,6 +140,7 @@ namespace RvtToNavisConverter.ViewModels
             ValidateDefaultDownloadPathCommand = new RelayCommand(_ => DefaultDownloadPathStatus = _validationService.ValidatePath(AppSettings.DefaultDownloadPath, false));
             ValidateDefaultNwcPathCommand = new RelayCommand(_ => DefaultNwcPathStatus = _validationService.ValidatePath(AppSettings.DefaultNwcPath, false));
             ValidateDefaultNwdPathCommand = new RelayCommand(_ => DefaultNwdPathStatus = _validationService.ValidatePath(AppSettings.DefaultNwdPath, false));
+            ShowHardwareIdCommand = new RelayCommand(_ => ShowHardwareId());
 
             _ = ValidateAllAsync();
             _ = LoadDetectedTools();
@@ -272,6 +276,32 @@ namespace RvtToNavisConverter.ViewModels
             AppSettings = _settingsService.LoadSettings();
             _ = ValidateAllAsync();
             _ = LoadDetectedTools();
+        }
+
+        private void ShowHardwareId()
+        {
+            try
+            {
+                var app = (App)Application.Current;
+                var serviceProvider = app.Services;
+                if (serviceProvider != null)
+                {
+                    var hardwareIdService = serviceProvider.GetService<IHardwareIdService>();
+                    if (hardwareIdService != null)
+                    {
+                        var hardwareId = hardwareIdService.GetHardwareId();
+                        var message = $"Your Hardware ID:\n\n{hardwareId}\n\n" +
+                                      "Send this ID to the developer when purchasing a license.\n" +
+                                      "You can copy this text with Ctrl+C.";
+                        
+                        MessageBox.Show(message, "Hardware ID", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error getting Hardware ID: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         public void RefreshValidation()

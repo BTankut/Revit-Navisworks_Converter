@@ -59,6 +59,59 @@ namespace RvtToNavisConverter.ViewModels
             set { _isLoading = value; OnPropertyChanged(); }
         }
 
+        private int _trialDaysRemaining;
+        public int TrialDaysRemaining
+        {
+            get => _trialDaysRemaining;
+            set 
+            { 
+                _trialDaysRemaining = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(TrialBackground)); 
+                OnPropertyChanged(nameof(TrialDisplayText));
+            }
+        }
+
+        private string _hardwareId = string.Empty;
+        public string HardwareId
+        {
+            get => _hardwareId;
+            set 
+            { 
+                _hardwareId = value; 
+                OnPropertyChanged(); 
+            }
+        }
+
+        public System.Windows.Media.Brush TrialBackground
+        {
+            get
+            {
+#if DEBUG
+                return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(33, 150, 243)); // Blue for debug
+#else
+                if (TrialDaysRemaining <= 3)
+                    return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 67, 54)); // Red
+                else if (TrialDaysRemaining <= 7)
+                    return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 193, 7)); // Amber
+                else
+                    return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // Green
+#endif
+            }
+        }
+
+        public string TrialDisplayText
+        {
+            get
+            {
+#if DEBUG
+                return "DEBUG MODE - No License Check";
+#else
+                return $"Trial Version - {TrialDaysRemaining} days remaining";
+#endif
+            }
+        }
+
         public ICommand ConnectCommand { get; }
         public ICommand BrowseLocalCommand { get; }
         public ICommand GoUpCommand { get; }
@@ -66,6 +119,7 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand StartProcessingCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand OpenMonitorCommand { get; }
+        public ICommand OpenAboutCommand { get; }
         public ICommand CancelCommand { get; }
         public ICommand ClearAllSelectionsCommand { get; }
         public ICommand ToggleDownloadCommand { get; }
@@ -74,7 +128,7 @@ namespace RvtToNavisConverter.ViewModels
         private CancellationTokenSource? _cancellationTokenSource;
         private readonly Dictionary<string, IFileSystemItem> _selectedItems = new Dictionary<string, IFileSystemItem>();
 
-        public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, IRevitFileVersionService revitFileVersionService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper, SelectionManager selectionManager)
+        public MainViewModel(IServiceProvider serviceProvider, ISettingsService settingsService, IRevitServerService revitServerService, ILocalFileService localFileService, IFileDownloadService fileDownloadService, INavisworksConversionService navisworksConversionService, IFileStatusService fileStatusService, IRevitFileVersionService revitFileVersionService, IHardwareIdService hardwareIdService, SettingsViewModel settingsViewModel, ProgressViewModel progressViewModel, MonitorViewModel monitorViewModel, PowerShellHelper powerShellHelper, SelectionManager selectionManager)
         {
             _serviceProvider = serviceProvider;
             _settingsService = settingsService;
@@ -93,6 +147,16 @@ namespace RvtToNavisConverter.ViewModels
 
             // Subscribe to the PowerShell log event
             powerShellHelper.CommandLog += _monitorViewModel.AddLogEntry;
+            
+            // Initialize trial days from license validation
+            var licenseValidation = Application.Current.Properties["LicenseValidation"] as LicenseValidationResult;
+            if (licenseValidation != null)
+            {
+                TrialDaysRemaining = licenseValidation.DaysRemaining;
+            }
+            
+            // Initialize Hardware ID
+            HardwareId = hardwareIdService.GetHardwareId();
 
             ConnectCommand = new RelayCommand(async _ => await ConnectToServerAsync(), _ => !IsLoading);
             BrowseLocalCommand = new RelayCommand(async _ => await BrowseLocalAsync(), _ => !IsLoading);
@@ -117,6 +181,7 @@ StartProcessingCommand = new RelayCommand(
 );
             OpenSettingsCommand = new RelayCommand(_ => OpenSettings(), _ => !IsLoading);
             OpenMonitorCommand = new RelayCommand(_ => OpenMonitor(), _ => !IsLoading);
+            OpenAboutCommand = new RelayCommand(_ => OpenAbout(), _ => !IsLoading);
             CancelCommand = new RelayCommand(_ => CancelOperation(), _ => IsLoading);
             ClearAllSelectionsCommand = new RelayCommand(_ => ClearAllSelections(), _ => !IsLoading);
 ToggleDownloadCommand = new RelayCommand(
@@ -321,6 +386,12 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                 monitorWindow.DataContext = _monitorViewModel;
                 monitorWindow.Show();
             }
+        }
+
+        private void OpenAbout()
+        {
+            var aboutDialog = new AboutDialog { DataContext = this, Owner = Application.Current.MainWindow };
+            aboutDialog.ShowDialog();
         }
 
         private void CancelOperation()

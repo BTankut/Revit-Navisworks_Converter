@@ -30,7 +30,16 @@
       "Bash(powershell:*)",
       "Bash(dotnet build:*)",
       "Bash(del \"C:\\Users\\BT\\CascadeProjects\\RVT to Navis Cline\\RvtToNavisConverter\\TestRevitVersion.cs\")",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(xcopy:*)",
+      "Bash(robocopy:*)",
+      "Bash(cp:*)",
+      "Bash(git checkout:*)",
+      "Bash(start RvtToNavisConverter.exe)",
+      "Bash(cmd /c:*)",
+      "Bash(LicenseGenerator.exe)",
+      "Bash(csc:*)",
+      "Bash(GenerateRsaKeys.exe)"
     ],
     "deny": []
   }
