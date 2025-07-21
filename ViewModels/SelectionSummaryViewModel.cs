@@ -154,8 +154,9 @@ namespace RvtToNavisConverter.ViewModels
                     
                     // Get all files from the folder contents stored in SelectionManager
                     var folderContents = _selectionManager.GetFolderContents(folderPath);
-                    if (folderContents != null)
+                    if (folderContents != null && folderContents.Any())
                     {
+                        FileLogger.Log($"  Found {folderContents.Count} items in folder contents");
                         foreach (var filePath in folderContents.Where(p => !p.EndsWith("\\*")))
                         {
                             // Check if this specific file has been deselected
@@ -183,9 +184,14 @@ namespace RvtToNavisConverter.ViewModels
                             }
                         }
                     }
+                    else
+                    {
+                        FileLogger.Log($"  No folder contents found for: {folderPath}");
+                    }
                 }
                 
                 // Then process individual file selections that aren't part of folders
+                FileLogger.Log($"Processing individual file selections...");
                 foreach (var kvp in selections)
                 {
                     var path = kvp.Key;
@@ -206,8 +212,14 @@ namespace RvtToNavisConverter.ViewModels
                         continue;
                     
                     // This is an individual file selection
-                    if (System.IO.File.Exists(path) || !System.IO.Directory.Exists(path))
+                    // For server files, we can't use File.Exists, so check if it's not a directory path
+                    var isFile = path.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                                 (!path.EndsWith("\\") && !path.EndsWith("/"));
+                    
+                    if (isFile)
                     {
+                        FileLogger.Log($"  Processing file: {path}, Download={state.IsSelectedForDownload}, Convert={state.IsSelectedForConversion}");
+                        
                         var fileName = System.IO.Path.GetFileName(path);
                         var isLocal = !path.StartsWith("\\\\");
                         
@@ -219,10 +231,16 @@ namespace RvtToNavisConverter.ViewModels
                         };
 
                         if (state.IsSelectedForDownload == true && !isLocal)
+                        {
                             downloadFiles.Add(fileItem);
+                            FileLogger.Log($"    Added to download list");
+                        }
                         
                         if (state.IsSelectedForConversion == true)
+                        {
                             convertFiles.Add(fileItem);
+                            FileLogger.Log($"    Added to convert list");
+                        }
                     }
                 }
 
