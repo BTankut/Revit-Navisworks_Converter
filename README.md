@@ -2,7 +2,7 @@
 
 A WPF desktop application for downloading Revit files from Revit Server and converting them to Navisworks formats (.nwd/.nwc).
 
-![Version](https://img.shields.io/badge/version-2.4.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.4.9-blue.svg)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-purple.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -184,6 +184,11 @@ Application logs are stored at:
 
 ## Version History
 
+- **v2.4.9** - Fixed duplicate file counting in error reports and improved error handling
+- **v2.4.8** - Added conversion.log parsing to detect failed conversions
+- **v2.4.7** - Restored /log parameter support for conversion logging
+- **v2.4.6** - Fixed temp file locking issues by adding GUID to temp file names
+- **v2.4.5** - Improved conversion error detection and reporting
 - **v2.4.1** - Fixed Selection Summary folder handling and automatic updates
 - **v2.4.0** - Fixed critical bug with failed downloads being sent to conversion
 - **v2.3.0** - Enhanced logging with timestamps and improved UI text alignment

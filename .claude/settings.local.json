@@ -40,7 +40,14 @@
       "Bash(LicenseGenerator.exe)",
       "Bash(csc:*)",
       "Bash(GenerateRsaKeys.exe)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git fetch:*)",
+      "mcp__github-binary__get_me",
+      "WebFetch(domain:knowledge.autodesk.com)",
+      "WebFetch(domain:www.autodesk.com)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(git log:*)"
     ],
     "deny": []
   }

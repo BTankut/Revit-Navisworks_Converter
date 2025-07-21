@@ -39,7 +39,7 @@ namespace RvtToNavisConverter.Services
             {
                 Directory.CreateDirectory(nwdDirectory);
             }
-            var tempFileListPath = Path.Combine(Path.GetTempPath(), "revit_files_to_convert.txt");
+            var tempFileListPath = Path.Combine(Path.GetTempPath(), $"revit_files_to_convert_{Guid.NewGuid()}.txt");
 
             // The Navisworks utility expects the path to the .rvt container folder for server files, 
             // and the direct file path for local files.
@@ -100,12 +100,18 @@ namespace RvtToNavisConverter.Services
                 return failedResult;
             }
             
-            File.WriteAllLines(tempFileListPath, filePaths, Encoding.UTF8);
-
-            var arguments = new List<string>
+            var conversionResult = new ConversionResult();
+            
+            try
             {
-                $@"/i ""{tempFileListPath}"""
-            };
+                File.WriteAllLines(tempFileListPath, filePaths, Encoding.UTF8);
+                // Small delay to ensure file is written and accessible
+                await Task.Delay(100);
+
+                var arguments = new List<string>
+                {
+                    $@"/i ""{tempFileListPath}"""
+                };
 
             if (!string.IsNullOrEmpty(task.OutputNwdFile))
             {
@@ -134,9 +140,6 @@ namespace RvtToNavisConverter.Services
             {
                 arguments.Add("/view");
             }
-            
-            // Add timeout parameter for large files
-            arguments.Add("/timeout 1200"); // 20 minutes timeout per file - increased for complex parking models
 
             var argumentString = string.Join(" ", arguments);
             var scriptString = $@"& ""{settings.NavisworksToolPath}"" {argumentString}";
@@ -145,145 +148,201 @@ namespace RvtToNavisConverter.Services
             var result = await _psHelper.RunScriptStringAsync(scriptString);
             FileLogger.Log($"Navisworks script result: {result}");
 
-            // Do not delete the temp file immediately, the external process might still need it.
-            // File.Delete(tempFileListPath);
+                // Delete temp file after a delay to ensure FileToolsTaskRunner is done with it
+                await Task.Delay(5000);
+                try { File.Delete(tempFileListPath); } catch { /* Ignore cleanup errors */ }
 
-            // Parse conversion log to determine success/failure for each file
-            var conversionResult = new ConversionResult();
-            conversionResult.OverallSuccess = !result.Contains("An error occurred");
+            // Parse conversion result
+            conversionResult.OverallSuccess = !result.Contains("Usage:") && !result.Contains("An error occurred");
             
-            // Read the conversion log file to check individual file status
+            // Check conversion log for errors
+            await Task.Delay(2000); // Give the conversion process time to complete
+            
             if (!string.IsNullOrEmpty(task.LogFilePath) && File.Exists(task.LogFilePath))
             {
-                await Task.Delay(1000); // Give the log file time to be written
-                var logContent = File.ReadAllText(task.LogFilePath);
+                try
+                {
+                    var logContent = File.ReadAllText(task.LogFilePath);
+                    FileLogger.Log($"Conversion log content preview: {logContent.Substring(0, Math.Min(500, logContent.Length))}");
+                    
+                    // Check for any errors in the log
+                    if (logContent.Contains("An error occurred:") || logContent.Contains("was canceled"))
+                    {
+                        conversionResult.OverallSuccess = false;
+                        FileLogger.LogError("Errors found in conversion log");
+                        
+                        // Parse which files failed
+                        var lines = logContent.Split('\n');
+                        foreach (var line in lines)
+                        {
+                            if (line.Contains("was canceled") || line.Contains("An error occurred:"))
+                            {
+                                foreach (var file in task.FilesToProcess)
+                                {
+                                    if (line.Contains(file.Name) || line.Contains(Path.GetFileNameWithoutExtension(file.Name)))
+                                    {
+                                        conversionResult.FileResults[file.Name] = false;
+                                        if (!conversionResult.FailedFiles.Contains(file.Name))
+                                        {
+                                            conversionResult.FailedFiles.Add(file.Name);
+                                        }
+                                        FileLogger.LogError($"File failed during conversion: {file.Name} - {line.Trim()}");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.LogError($"Error reading conversion log: {ex.Message}");
+                }
+            }
                 
                 foreach (var file in task.FilesToProcess)
                 {
-                    var fileName = Path.GetFileNameWithoutExtension(file.Name);
-                    
-                    // Check if file was loaded successfully or had an error
-                    if (logContent.Contains($"Loading {Path.Combine(settings.DefaultDownloadPath, file.Name)}"))
+                    // Skip if already marked as failed from log parsing
+                    if (conversionResult.FileResults.ContainsKey(file.Name) && !conversionResult.FileResults[file.Name])
                     {
-                        // Check if there's an error for this specific file
-                        if (logContent.Contains($"Load of {file.Name} was canceled") || 
-                            logContent.Contains($"An error occurred: Load of {file.Name} was canceled"))
-                        {
-                            conversionResult.FileResults[file.Name] = false;
-                            conversionResult.FailedFiles.Add(file.Name);
-                            FileLogger.LogError($"Conversion failed for {file.Name}: Load was canceled");
-                        }
-                        else
-                        {
-                            conversionResult.FileResults[file.Name] = true;
-                        }
+                        continue;
+                    }
+                    
+                    var filePath = file.IsLocal ? file.Path : Path.Combine(settings.DefaultDownloadPath, file.Name);
+                    var nwcPath = Path.ChangeExtension(filePath, ".nwc");
+                    var nwdPath = Path.ChangeExtension(filePath, ".nwd");
+                    
+                    // Check if either NWC or NWD file was created
+                    bool fileConverted = false;
+                    
+                    if (!string.IsNullOrEmpty(task.OutputNwdFile))
+                    {
+                        // When creating a single NWD file, check if it exists
+                        var outputPath = Path.Combine(settings.DefaultNwdPath, task.OutputNwdFile);
+                        fileConverted = File.Exists(outputPath);
                     }
                     else
                     {
-                        // If file is not mentioned in log at all, assume it failed
+                        // When creating individual NWC files, check if the NWC file exists
+                        fileConverted = File.Exists(nwcPath);
+                    }
+                    
+                    if (fileConverted && !conversionResult.FileResults.ContainsKey(file.Name))
+                    {
+                        conversionResult.FileResults[file.Name] = true;
+                        FileLogger.Log($"Conversion successful for {file.Name}");
+                    }
+                    else if (!fileConverted && !conversionResult.FileResults.ContainsKey(file.Name))
+                    {
                         conversionResult.FileResults[file.Name] = false;
-                        conversionResult.FailedFiles.Add(file.Name);
-                        FileLogger.LogError($"Conversion failed for {file.Name}: Not found in conversion log");
+                        if (!conversionResult.FailedFiles.Contains(file.Name))
+                        {
+                            conversionResult.FailedFiles.Add(file.Name);
+                        }
+                        FileLogger.LogError($"Conversion failed for {file.Name}: Output file not found");
                     }
                 }
                 
                 // Update overall success based on individual files
                 conversionResult.OverallSuccess = conversionResult.FailedFiles.Count == 0;
+            
+            // If there are failed files and ProcessIndividually is enabled, retry them one by one
+            if (task.ProcessIndividually && conversionResult.FailedFiles.Any())
+            {
+                FileLogger.Log($"Retrying {conversionResult.FailedFiles.Count} failed files individually...");
+                FileLogger.Log("Note: 'Load was canceled' errors can be caused by file locking, memory issues, or file access problems");
                 
-                // If there are failed files and ProcessIndividually is enabled, retry them one by one
-                if (task.ProcessIndividually && conversionResult.FailedFiles.Any())
+                var failedFiles = task.FilesToProcess.Where(f => conversionResult.FailedFiles.Contains(f.Name)).ToList();
+                foreach (var file in failedFiles)
                 {
-                    FileLogger.Log($"Retrying {conversionResult.FailedFiles.Count} failed files individually...");
-                    FileLogger.Log("Note: 'Load was canceled' errors can be caused by file locking, memory issues, or file access problems");
+                    FileLogger.Log($"Retrying individual conversion for {file.Name}");
                     
-                    var failedFiles = task.FilesToProcess.Where(f => conversionResult.FailedFiles.Contains(f.Name)).ToList();
-                    foreach (var file in failedFiles)
+                    // Create a temporary file list with just this one file
+                    var singleFilePath = Path.Combine(Path.GetTempPath(), $"single_file_{Guid.NewGuid()}.txt");
+                    var singleFileFullPath = file.IsLocal ? file.Path : Path.Combine(settings.DefaultDownloadPath, file.Name);
+                    File.WriteAllLines(singleFilePath, new[] { singleFileFullPath }, Encoding.UTF8);
+                    
+                    // Create individual NWC file ONLY (no NWD)
+                    // By not specifying /of parameter, only NWC will be created
+                    var individualArgs = new List<string>
                     {
-                        FileLogger.Log($"Retrying individual conversion for {file.Name}");
+                        $@"/i ""{singleFilePath}""",
+                        "/osd" // Output to same directory
+                    };
+                    
+                    var individualScript = $@"& ""{settings.NavisworksToolPath}"" {string.Join(" ", individualArgs)}";
+                    FileLogger.Log($"Executing individual conversion: {individualScript}");
+                    
+                    var individualResult = await _psHelper.RunScriptStringAsync(individualScript);
+                    
+                    var nwcPath = Path.ChangeExtension(singleFileFullPath, ".nwc");
+                    if (!individualResult.Contains("Usage:") && !individualResult.Contains("An error occurred") && File.Exists(nwcPath))
+                    {
+                        conversionResult.FileResults[file.Name] = true;
+                        conversionResult.FailedFiles.Remove(file.Name);
+                        FileLogger.Log($"Individual conversion successful for {file.Name}");
+                    }
+                    else
+                    {
+                        FileLogger.LogError($"Individual conversion also failed for {file.Name}");
                         
-                        // Create a temporary file list with just this one file
-                        var singleFilePath = Path.Combine(Path.GetTempPath(), $"single_file_{Guid.NewGuid()}.txt");
-                        var singleFileFullPath = file.IsLocal ? file.Path : Path.Combine(settings.DefaultDownloadPath, file.Name);
-                        File.WriteAllLines(singleFilePath, new[] { singleFileFullPath }, Encoding.UTF8);
+                        // Based on Autodesk forums, "Load was canceled" can be due to:
+                        // 1. File locking issues - add delay before retry
+                        // 2. Memory issues - try with minimal memory footprint
+                        // 3. File access method - some files work better with different approaches
                         
-                        // Create individual NWC file ONLY (no NWD)
-                        // By not specifying /of parameter, only NWC will be created
-                        var individualArgs = new List<string>
+                        FileLogger.Log($"Waiting 5 seconds before final retry attempt for {file.Name}");
+                        await Task.Delay(5000); // Wait 5 seconds to ensure file locks are released
+                        
+                        // Final attempt with different approach based on community solutions
+                        var finalArgs = new List<string>
                         {
                             $@"/i ""{singleFilePath}""",
-                            "/timeout 1200", // 20 minutes timeout for individual files - parking models need more time
-                            "/osd" // Open and save document - forces file to be fully loaded
+                            "/osd" // Output to same directory
                         };
                         
-                        var individualScript = $@"& ""{settings.NavisworksToolPath}"" {string.Join(" ", individualArgs)}";
-                        FileLogger.Log($"Executing individual conversion: {individualScript}");
+                        var finalScript = $@"& ""{settings.NavisworksToolPath}"" {string.Join(" ", finalArgs)}";
+                        FileLogger.Log($"Executing final conversion attempt: {finalScript}");
                         
-                        var individualResult = await _psHelper.RunScriptStringAsync(individualScript);
+                        var finalResult = await _psHelper.RunScriptStringAsync(finalScript);
                         
-                        var nwcPath = Path.ChangeExtension(singleFileFullPath, ".nwc");
-                        if (!individualResult.Contains("An error occurred") && File.Exists(nwcPath))
+                        if (!finalResult.Contains("Usage:") && !finalResult.Contains("An error occurred") && File.Exists(nwcPath))
                         {
                             conversionResult.FileResults[file.Name] = true;
                             conversionResult.FailedFiles.Remove(file.Name);
-                            FileLogger.Log($"Individual conversion successful for {file.Name}");
+                            FileLogger.Log($"Final conversion attempt successful for {file.Name}");
                         }
                         else
                         {
-                            FileLogger.LogError($"Individual conversion also failed for {file.Name}");
-                            
-                            // Based on Autodesk forums, "Load was canceled" can be due to:
-                            // 1. File locking issues - add delay before retry
-                            // 2. Memory issues - try with minimal memory footprint
-                            // 3. File access method - some files work better with different approaches
-                            
-                            FileLogger.Log($"Waiting 5 seconds before final retry attempt for {file.Name}");
-                            await Task.Delay(5000); // Wait 5 seconds to ensure file locks are released
-                            
-                            // Final attempt with different approach based on community solutions
-                            var finalArgs = new List<string>
-                            {
-                                $@"/i ""{singleFilePath}""",
-                                "/timeout 1800", // 30 minutes timeout
-                                "/osd" // Open and save document - forces different loading method
-                            };
-                            
-                            var finalScript = $@"& ""{settings.NavisworksToolPath}"" {string.Join(" ", finalArgs)}";
-                            FileLogger.Log($"Executing final conversion attempt: {finalScript}");
-                            
-                            var finalResult = await _psHelper.RunScriptStringAsync(finalScript);
-                            
-                            if (!finalResult.Contains("An error occurred") && File.Exists(nwcPath))
-                            {
-                                conversionResult.FileResults[file.Name] = true;
-                                conversionResult.FailedFiles.Remove(file.Name);
-                                FileLogger.Log($"Final conversion attempt successful for {file.Name}");
-                            }
-                            else
-                            {
-                                FileLogger.LogError($"All conversion attempts failed for {file.Name}.");
-                                FileLogger.LogError($"Possible causes: file locking, insufficient memory, or corrupted source file.");
-                                FileLogger.LogError($"Recommended actions: 1) Close all Revit instances, 2) Audit the source file, 3) Try manual conversion");
-                            }
+                            FileLogger.LogError($"All conversion attempts failed for {file.Name}.");
+                            FileLogger.LogError($"Possible causes: file locking, insufficient memory, or corrupted source file.");
+                            FileLogger.LogError($"Recommended actions: 1) Close all Revit instances, 2) Audit the source file, 3) Try manual conversion");
                         }
-                        
-                        // Clean up temp file
-                        try { File.Delete(singleFilePath); } catch { }
                     }
                     
-                    // Update overall success
-                    conversionResult.OverallSuccess = conversionResult.FailedFiles.Count == 0;
-                    
-                    // After individual retries, if we need to create a consolidated NWD with only successful files
-                    // we would need to run FileToolsTaskRunner again with only the successful files
-                    // But this is complex because the tool creates both NWC and NWD together
-                    // For now, the initial batch run already created the NWD with whatever files succeeded
-                    
-                    if (conversionResult.FailedFiles.Any())
-                    {
-                        FileLogger.LogWarning($"Initial NWD file was created but {conversionResult.FailedFiles.Count} files failed to convert");
-                        FileLogger.LogWarning($"Failed files: {string.Join(", ", conversionResult.FailedFiles)}");
-                    }
+                    // Clean up temp file
+                    try { File.Delete(singleFilePath); } catch { }
                 }
+                
+                // Update overall success
+                conversionResult.OverallSuccess = conversionResult.FailedFiles.Count == 0;
+                
+                // After individual retries, if we need to create a consolidated NWD with only successful files
+                // we would need to run FileToolsTaskRunner again with only the successful files
+                // But this is complex because the tool creates both NWC and NWD together
+                // For now, the initial batch run already created the NWD with whatever files succeeded
+                
+                if (conversionResult.FailedFiles.Any())
+                {
+                    FileLogger.LogWarning($"Initial NWD file was created but {conversionResult.FailedFiles.Count} files failed to convert");
+                    FileLogger.LogWarning($"Failed files: {string.Join(", ", conversionResult.FailedFiles)}");
+                }
+            }
+            }
+            finally
+            {
+                // Additional cleanup attempt in case of early exit
+                await Task.Delay(1000);
+                try { if (File.Exists(tempFileListPath)) File.Delete(tempFileListPath); } catch { }
             }
             
             return conversionResult;

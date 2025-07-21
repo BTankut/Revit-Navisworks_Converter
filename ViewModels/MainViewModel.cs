@@ -817,7 +817,31 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
             var individualSelections = allSelections.Where(kvp => !kvp.Key.EndsWith("\\*")).ToList();
             FileLogger.Log($"Processing {individualSelections.Count} individual selections");
             
+            // Filter out parent folders that are not actual user selections
+            // These are added automatically by UpdateParentStates and should not be processed
+            var userSelections = new List<KeyValuePair<string, SelectionState>>();
             foreach (var kvp in individualSelections)
+            {
+                var path = kvp.Key;
+                
+                // Check if this is a parent folder of any actual file selection
+                bool isParentOfFileSelection = individualSelections.Any(sel => 
+                    sel.Key != path && 
+                    sel.Key.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase) &&
+                    sel.Key.StartsWith(path + "\\", StringComparison.OrdinalIgnoreCase));
+                
+                if (isParentOfFileSelection)
+                {
+                    FileLogger.Log($"  Skipping parent folder: {path} (auto-added by UpdateParentStates)");
+                    continue;
+                }
+                
+                userSelections.Add(kvp);
+            }
+            
+            FileLogger.Log($"Processing {userSelections.Count} user selections (after filtering parent folders)");
+            
+            foreach (var kvp in userSelections)
             {
                 var path = kvp.Key;
                 var selectionState = kvp.Value;
@@ -1177,6 +1201,17 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
         private async Task<List<FileItem>> GetSelectedFilesRecursive(string path, bool isLocal, bool checkDownload, bool checkConversion)
         {
             FileLogger.Log($"GetSelectedFilesRecursive: path={path}, isLocal={isLocal}, checkDownload={checkDownload}, checkConversion={checkConversion}");
+            
+            // Safety check: Don't scan root drives or system folders
+            if (path.Length <= 3 || // C:\ or similar
+                path.Equals("C:\\Users", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("C:\\Windows", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("C:\\Program Files", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("C:\\Program Files (x86)", StringComparison.OrdinalIgnoreCase))
+            {
+                FileLogger.Log($"  WARNING: Skipping system folder scan: {path}");
+                return new List<FileItem>();
+            }
             
             var selectedFiles = new List<FileItem>();
             var items = isLocal 

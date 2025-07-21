@@ -233,20 +233,22 @@ namespace RvtToNavisConverter.ViewModels
                     if (path.EndsWith("\\*"))
                         continue;
                     
-                    // Check if this file is already included from a folder
-                    var alreadyIncluded = downloadFiles.Any(f => f.Path == path) || 
-                                        convertFiles.Any(f => f.Path == path);
-                    if (alreadyIncluded)
-                        continue;
-                    
                     // Skip directories - only process .rvt files
                     if (path.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) < 0)
                     {
-                        // This might be a folder without a marker - try to load its contents
+                        // This might be a folder without a marker
                         if (!path.Contains(".") && (state.IsSelectedForDownload == true || state.IsSelectedForConversion == true))
                         {
                             FileLogger.Log($"  Found folder selection without marker: {path}");
                             var isLocal = !path.StartsWith("\\\\");
+                            
+                            // Check if we already have a folder marker for this path
+                            var hasFolderMarker = selections.ContainsKey(path + "\\*");
+                            if (hasFolderMarker)
+                            {
+                                FileLogger.Log($"  Skipping - folder marker already exists for: {path}");
+                                continue;
+                            }
                             
                             // Load folder contents
                             try
@@ -261,6 +263,15 @@ namespace RvtToNavisConverter.ViewModels
                                 // Process the files in this folder
                                 foreach (var filePath in paths.Where(p => p.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) >= 0))
                                 {
+                                    // Check if this file is already included
+                                    var fileAlreadyIncluded = downloadFiles.Any(f => f.Path == filePath) || 
+                                                        convertFiles.Any(f => f.Path == filePath);
+                                    if (fileAlreadyIncluded)
+                                    {
+                                        FileLogger.Log($"    Skipping duplicate file: {filePath}");
+                                        continue;
+                                    }
+                                    
                                     var fileName = System.IO.Path.GetFileName(filePath);
                                     var fileItem = new FileItem
                                     {
@@ -283,6 +294,12 @@ namespace RvtToNavisConverter.ViewModels
                         }
                         continue;
                     }
+                    
+                    // Check if this file is already included from a folder
+                    var alreadyIncluded = downloadFiles.Any(f => f.Path == path) || 
+                                        convertFiles.Any(f => f.Path == path);
+                    if (alreadyIncluded)
+                        continue;
                     
                     // This is an individual .rvt file selection
                     if (true)
