@@ -129,7 +129,7 @@ namespace RvtToNavisConverter.ViewModels
             RefreshSelections();
         }
 
-        public async void RefreshSelections()
+        public void RefreshSelections()
         {
             try
             {
@@ -185,47 +185,6 @@ namespace RvtToNavisConverter.ViewModels
             catch (Exception ex)
             {
                 FileLogger.LogError($"Error refreshing selections: {ex.Message}");
-            }
-        }
-
-        private async System.Threading.Tasks.Task ProcessItemsRecursive(
-            System.Collections.Generic.List<IFileSystemItem> items,
-            SelectionState parentState,
-            ObservableCollection<FileItem> downloadFiles,
-            ObservableCollection<FileItem> convertFiles,
-            bool isLocal)
-        {
-            foreach (var item in items)
-            {
-                if (item is FileItem file)
-                {
-                    file.IsLocal = isLocal;
-                    
-                    // Check individual file selection state
-                    var fileState = _selectionManager.GetSelectionState(file.Path);
-                    
-                    // Use file's own state if set, otherwise use parent state
-                    var shouldDownload = fileState?.IsSelectedForDownload ?? parentState.IsSelectedForDownload;
-                    var shouldConvert = fileState?.IsSelectedForConversion ?? parentState.IsSelectedForConversion;
-
-                    if (shouldDownload == true && !isLocal)
-                        downloadFiles.Add(file);
-                    
-                    if (shouldConvert == true)
-                        convertFiles.Add(file);
-                }
-                else if (item is FolderItem folder)
-                {
-                    var folderItems = isLocal
-                        ? await _localFileService.GetDirectoryContentsAsync(folder.Path, System.Threading.CancellationToken.None)
-                        : await _revitServerService.GetDirectoryContentsAsync(folder.Path, System.Threading.CancellationToken.None);
-
-                    // Check folder's own state
-                    var folderState = _selectionManager.GetSelectionState(folder.Path + "\\*");
-                    var effectiveState = folderState ?? parentState;
-
-                    await ProcessItemsRecursive(folderItems.ToList(), effectiveState, downloadFiles, convertFiles, isLocal);
-                }
             }
         }
 

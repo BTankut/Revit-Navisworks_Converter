@@ -432,6 +432,14 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                 Owner = Application.Current.MainWindow
             };
             
+            // Log current selections before showing window
+            var allSelections = _selectionManager.GetAllSelections();
+            FileLogger.Log($"OpenSelectionSummary: Total selections in manager: {allSelections.Count}");
+            foreach (var kvp in allSelections.Take(10)) // Log first 10 for debugging
+            {
+                FileLogger.Log($"  Selection: {kvp.Key} - Download: {kvp.Value.IsSelectedForDownload}, Convert: {kvp.Value.IsSelectedForConversion}");
+            }
+            
             _selectionSummaryWindow.Closed += (s, e) => 
             {
                 // Unsubscribe from selection changes
