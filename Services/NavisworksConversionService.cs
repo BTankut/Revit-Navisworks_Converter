@@ -47,6 +47,8 @@ namespace RvtToNavisConverter.Services
             
             // Validate that all files exist before attempting conversion
             var missingFiles = new List<string>();
+            var lockedFiles = new List<string>();
+            
             foreach (var filePath in filePaths)
             {
                 if (!File.Exists(filePath))
@@ -54,21 +56,46 @@ namespace RvtToNavisConverter.Services
                     missingFiles.Add(filePath);
                     FileLogger.LogError($"File not found for conversion: {filePath}");
                 }
+                else if (FileLockChecker.IsFileLocked(filePath))
+                {
+                    FileLogger.Log($"File is locked, waiting for it to be available: {filePath}");
+                    if (!FileLockChecker.WaitForFile(filePath, 30))
+                    {
+                        lockedFiles.Add(filePath);
+                        FileLogger.LogError($"File remains locked after 30 seconds: {filePath}");
+                    }
+                }
             }
             
-            if (missingFiles.Any())
+            if (missingFiles.Any() || lockedFiles.Any())
             {
-                FileLogger.LogError($"Conversion aborted: {missingFiles.Count} files are missing");
-                foreach (var missing in missingFiles)
+                if (missingFiles.Any())
                 {
-                    FileLogger.LogError($"  Missing: {missing}");
+                    FileLogger.LogError($"Conversion aborted: {missingFiles.Count} files are missing");
+                    foreach (var missing in missingFiles)
+                    {
+                        FileLogger.LogError($"  Missing: {missing}");
+                    }
+                }
+                
+                if (lockedFiles.Any())
+                {
+                    FileLogger.LogError($"Conversion aborted: {lockedFiles.Count} files are locked");
+                    foreach (var locked in lockedFiles)
+                    {
+                        FileLogger.LogError($"  Locked: {locked}");
+                    }
                 }
                 
                 var failedResult = new ConversionResult { OverallSuccess = false };
                 foreach (var file in task.FilesToProcess)
                 {
-                    failedResult.FileResults[file.Name] = false;
-                    failedResult.FailedFiles.Add(file.Name);
+                    var filePath = file.IsLocal ? file.Path : Path.Combine(settings.DefaultDownloadPath, file.Name);
+                    if (missingFiles.Contains(filePath) || lockedFiles.Contains(filePath))
+                    {
+                        failedResult.FileResults[file.Name] = false;
+                        failedResult.FailedFiles.Add(file.Name);
+                    }
                 }
                 return failedResult;
             }
@@ -167,7 +194,7 @@ namespace RvtToNavisConverter.Services
                 if (task.ProcessIndividually && conversionResult.FailedFiles.Any())
                 {
                     FileLogger.Log($"Retrying {conversionResult.FailedFiles.Count} failed files individually...");
-                    FileLogger.Log("Note: Failed files appear to be complex models (parking) that may require special handling");
+                    FileLogger.Log("Note: 'Load was canceled' errors can be caused by file locking, memory issues, or file access problems");
                     
                     var failedFiles = task.FilesToProcess.Where(f => conversionResult.FailedFiles.Contains(f.Name)).ToList();
                     foreach (var file in failedFiles)
@@ -204,33 +231,38 @@ namespace RvtToNavisConverter.Services
                         {
                             FileLogger.LogError($"Individual conversion also failed for {file.Name}");
                             
-                            // For parking models that continue to fail, try one more time with minimal settings
-                            if (file.Name.Contains("_Parking"))
+                            // Based on Autodesk forums, "Load was canceled" can be due to:
+                            // 1. File locking issues - add delay before retry
+                            // 2. Memory issues - try with minimal memory footprint
+                            // 3. File access method - some files work better with different approaches
+                            
+                            FileLogger.Log($"Waiting 5 seconds before final retry attempt for {file.Name}");
+                            await Task.Delay(5000); // Wait 5 seconds to ensure file locks are released
+                            
+                            // Final attempt with different approach based on community solutions
+                            var finalArgs = new List<string>
                             {
-                                FileLogger.Log($"Attempting minimal conversion for parking model: {file.Name}");
-                                
-                                var minimalArgs = new List<string>
-                                {
-                                    $@"/i ""{singleFilePath}""",
-                                    "/timeout 1800", // 30 minutes for very complex models
-                                    "/version 2021" // Force Revit 2021 version compatibility
-                                };
-                                
-                                var minimalScript = $@"& ""{settings.NavisworksToolPath}"" {string.Join(" ", minimalArgs)}";
-                                FileLogger.Log($"Executing minimal conversion: {minimalScript}");
-                                
-                                var minimalResult = await _psHelper.RunScriptStringAsync(minimalScript);
-                                
-                                if (!minimalResult.Contains("An error occurred") && File.Exists(nwcPath))
-                                {
-                                    conversionResult.FileResults[file.Name] = true;
-                                    conversionResult.FailedFiles.Remove(file.Name);
-                                    FileLogger.Log($"Minimal conversion successful for {file.Name}");
-                                }
-                                else
-                                {
-                                    FileLogger.LogError($"All conversion attempts failed for {file.Name}. This file may require manual processing.");
-                                }
+                                $@"/i ""{singleFilePath}""",
+                                "/timeout 1800", // 30 minutes timeout
+                                "/osd" // Open and save document - forces different loading method
+                            };
+                            
+                            var finalScript = $@"& ""{settings.NavisworksToolPath}"" {string.Join(" ", finalArgs)}";
+                            FileLogger.Log($"Executing final conversion attempt: {finalScript}");
+                            
+                            var finalResult = await _psHelper.RunScriptStringAsync(finalScript);
+                            
+                            if (!finalResult.Contains("An error occurred") && File.Exists(nwcPath))
+                            {
+                                conversionResult.FileResults[file.Name] = true;
+                                conversionResult.FailedFiles.Remove(file.Name);
+                                FileLogger.Log($"Final conversion attempt successful for {file.Name}");
+                            }
+                            else
+                            {
+                                FileLogger.LogError($"All conversion attempts failed for {file.Name}.");
+                                FileLogger.LogError($"Possible causes: file locking, insufficient memory, or corrupted source file.");
+                                FileLogger.LogError($"Recommended actions: 1) Close all Revit instances, 2) Audit the source file, 3) Try manual conversion");
                             }
                         }
                         
