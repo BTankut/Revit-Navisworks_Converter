@@ -11,6 +11,7 @@ namespace RvtToNavisConverter.Models
         // Add other Navisworks options as properties here
         public string OutputVersion { get; set; } = string.Empty;
         public bool OpenAfterConversion { get; set; }
+        public bool ProcessIndividually { get; set; } // Process files one by one to isolate errors
 
         public ConversionTask()
         {
