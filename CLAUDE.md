@@ -273,7 +273,19 @@ dotnet build --configuration Release
 
 ## Current Known Issues & Recent Fixes
 
-### Recently Fixed (v2.4.0)
+### Recently Fixed
+#### v2.4.1 - Selection Summary Improvements
+- **Fixed**: Folders appearing in lists instead of files
+  - Made RefreshSelectionsAsync properly async to load folder contents
+  - Added automatic folder content loading when folder markers are found
+  - Added folder content processing for folders without markers
+  
+- **Fixed**: Selection Summary not updating automatically
+  - Converted RefreshSelections to async method (RefreshSelectionsAsync)
+  - Updated all callers to use Task.Run for async execution
+  - Selection changes now trigger automatic refresh
+
+#### v2.4.0
 - **Critical Bug**: Files that failed to download were being sent to conversion process
   - Solution: Added file existence validation before conversion
   - Enhanced error logging for download failures

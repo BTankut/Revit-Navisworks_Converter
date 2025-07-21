@@ -5,6 +5,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
+using System.Threading.Tasks;
 
 namespace RvtToNavisConverter.ViewModels
 {
@@ -121,15 +122,16 @@ namespace RvtToNavisConverter.ViewModels
             _downloadFiles = new ObservableCollection<FileItem>();
             _convertFiles = new ObservableCollection<FileItem>();
 
-            RefreshCommand = new RelayCommand(_ => RefreshSelections());
+            RefreshCommand = new RelayCommand(async _ => await RefreshSelectionsAsync());
             ClearAllCommand = new RelayCommand(_ => ClearAllSelections());
             RemoveDownloadCommand = new RelayCommand(RemoveFromDownload);
             RemoveConvertCommand = new RelayCommand(RemoveFromConvert);
 
-            RefreshSelections();
+            // Initial refresh
+            Task.Run(async () => await RefreshSelectionsAsync());
         }
 
-        public void RefreshSelections()
+        public async Task RefreshSelectionsAsync()
         {
             try
             {
@@ -154,11 +156,37 @@ namespace RvtToNavisConverter.ViewModels
                     
                     // Get all files from the folder contents stored in SelectionManager
                     var folderContents = _selectionManager.GetFolderContents(folderPath);
+                    
+                    // If folder contents not loaded yet, load them now
+                    if (folderContents == null || !folderContents.Any())
+                    {
+                        FileLogger.Log($"  Folder contents not loaded, loading now...");
+                        try
+                        {
+                            var items = isLocal 
+                                ? await _localFileService.GetDirectoryContentsAsync(folderPath, System.Threading.CancellationToken.None)
+                                : await _revitServerService.GetDirectoryContentsAsync(folderPath, System.Threading.CancellationToken.None);
+                            
+                            var paths = items.Select(i => i.Path).ToList();
+                            _selectionManager.SetFolderContents(folderPath, paths);
+                            folderContents = paths;
+                            FileLogger.Log($"  Loaded {paths.Count} items from folder");
+                        }
+                        catch (Exception ex)
+                        {
+                            FileLogger.LogError($"  Failed to load folder contents: {ex.Message}");
+                        }
+                    }
+                    
                     if (folderContents != null && folderContents.Any())
                     {
                         FileLogger.Log($"  Found {folderContents.Count} items in folder contents");
                         foreach (var filePath in folderContents.Where(p => !p.EndsWith("\\*")))
                         {
+                            // Skip if not a .rvt file
+                            if (filePath.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) < 0)
+                                continue;
+                                
                             // Check if this specific file has been deselected
                             var fileState = _selectionManager.GetSelectionState(filePath);
                             
@@ -211,12 +239,53 @@ namespace RvtToNavisConverter.ViewModels
                     if (alreadyIncluded)
                         continue;
                     
-                    // This is an individual file selection
-                    // For server files, we can't use File.Exists, so check if it's not a directory path
-                    var isFile = path.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                                 (!path.EndsWith("\\") && !path.EndsWith("/"));
+                    // Skip directories - only process .rvt files
+                    if (path.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        // This might be a folder without a marker - try to load its contents
+                        if (!path.Contains(".") && (state.IsSelectedForDownload == true || state.IsSelectedForConversion == true))
+                        {
+                            FileLogger.Log($"  Found folder selection without marker: {path}");
+                            var isLocal = !path.StartsWith("\\\\");
+                            
+                            // Load folder contents
+                            try
+                            {
+                                var items = isLocal 
+                                    ? await _localFileService.GetDirectoryContentsAsync(path, System.Threading.CancellationToken.None)
+                                    : await _revitServerService.GetDirectoryContentsAsync(path, System.Threading.CancellationToken.None);
+                                
+                                var paths = items.Select(i => i.Path).ToList();
+                                _selectionManager.SetFolderContents(path, paths);
+                                
+                                // Process the files in this folder
+                                foreach (var filePath in paths.Where(p => p.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) >= 0))
+                                {
+                                    var fileName = System.IO.Path.GetFileName(filePath);
+                                    var fileItem = new FileItem
+                                    {
+                                        Name = fileName,
+                                        Path = filePath,
+                                        IsLocal = isLocal
+                                    };
+                                    
+                                    if (state.IsSelectedForDownload == true && !isLocal)
+                                        downloadFiles.Add(fileItem);
+                                        
+                                    if (state.IsSelectedForConversion == true)
+                                        convertFiles.Add(fileItem);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                FileLogger.LogError($"  Failed to load folder contents: {ex.Message}");
+                            }
+                        }
+                        continue;
+                    }
                     
-                    if (isFile)
+                    // This is an individual .rvt file selection
+                    if (true)
                     {
                         FileLogger.Log($"  Processing file: {path}, Download={state.IsSelectedForDownload}, Convert={state.IsSelectedForConversion}");
                         
@@ -274,7 +343,7 @@ namespace RvtToNavisConverter.ViewModels
         private void ClearAllSelections()
         {
             _selectionManager.ClearAllSelections();
-            RefreshSelections();
+            Task.Run(async () => await RefreshSelectionsAsync());
         }
 
         private void RemoveFromDownload(object parameter)

@@ -457,7 +457,10 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
         private void OnSelectionChangedForSummary(object? sender, SelectionChangedEventArgs e)
         {
             // Update summary window if it's open
-            _selectionSummaryViewModel?.RefreshSelections();
+            if (_selectionSummaryViewModel != null)
+            {
+                Task.Run(async () => await _selectionSummaryViewModel.RefreshSelectionsAsync());
+            }
         }
 
         private void OpenAbout()
