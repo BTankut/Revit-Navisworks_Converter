@@ -120,6 +120,7 @@ namespace RvtToNavisConverter.ViewModels
         public ICommand OpenSettingsCommand { get; }
         public ICommand OpenMonitorCommand { get; }
         public ICommand OpenAboutCommand { get; }
+        public ICommand OpenSelectionSummaryCommand { get; }
         public ICommand CancelCommand { get; }
         public ICommand ClearAllSelectionsCommand { get; }
         public ICommand ToggleDownloadCommand { get; }
@@ -195,6 +196,7 @@ StartProcessingCommand = new RelayCommand(
             OpenSettingsCommand = new RelayCommand(_ => OpenSettings(), _ => !IsLoading);
             OpenMonitorCommand = new RelayCommand(_ => OpenMonitor(), _ => !IsLoading);
             OpenAboutCommand = new RelayCommand(_ => OpenAbout(), _ => !IsLoading);
+            OpenSelectionSummaryCommand = new RelayCommand(_ => OpenSelectionSummary(), _ => !IsLoading);
             CancelCommand = new RelayCommand(_ => CancelOperation(), _ => IsLoading);
             ClearAllSelectionsCommand = new RelayCommand(_ => ClearAllSelections(), _ => !IsLoading);
 ToggleDownloadCommand = new RelayCommand(
@@ -405,6 +407,21 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                 monitorWindow.DataContext = _monitorViewModel;
                 monitorWindow.Show();
             }
+        }
+
+        private void OpenSelectionSummary()
+        {
+            var summaryViewModel = new SelectionSummaryViewModel(
+                _selectionManager,
+                _localFileService,
+                _revitServerService);
+            
+            var summaryWindow = new SelectionSummaryView 
+            { 
+                DataContext = summaryViewModel,
+                Owner = Application.Current.MainWindow
+            };
+            summaryWindow.ShowDialog();
         }
 
         private void OpenAbout()
@@ -1007,18 +1024,45 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
                             FilesToProcess = finalConversionList,
                             OutputNwdFile = $"Consolidated_{DateTime.Now:yyyyMMddHHmmss}.nwd",
                             LogFilePath = Path.Combine(settings.DefaultNwdPath, "conversion.log"),
-                            OverwriteExisting = true
+                            OverwriteExisting = true,
+                            ProcessIndividually = true // Enable individual retry for failed files
                         };
-                        var success = await _navisworksConversionService.ConvertFilesAsync(conversionTask, settings);
-                        var status = success ? "Completed" : "Error";
+                        var conversionResult = await _navisworksConversionService.ConvertFilesAsync(conversionTask, settings);
                         var finalPercentage = 100;
+                        
                         foreach (var file in finalConversionList)
                         {
                             if (_cancellationTokenSource.Token.IsCancellationRequested) break;
-                            UpdateFileStatus(file, $"Conversion {status}");
-                             _progressViewModel.AddLog($"{file.Name} - Conversion {status}");
+                            
+                            // Check individual file result
+                            bool fileSuccess = false;
+                            if (conversionResult.FileResults.TryGetValue(file.Name, out fileSuccess))
+                            {
+                                var status = fileSuccess ? "Completed" : "Failed";
+                                UpdateFileStatus(file, $"Conversion {status}");
+                                _progressViewModel.AddLog($"{file.Name} - Conversion {status}");
+                                
+                                if (!fileSuccess)
+                                {
+                                    FileLogger.LogError($"Conversion failed for {file.Name}");
+                                }
+                            }
+                            else
+                            {
+                                // If file not in results, assume it failed
+                                UpdateFileStatus(file, "Conversion Failed");
+                                _progressViewModel.AddLog($"{file.Name} - Conversion Failed");
+                                FileLogger.LogError($"Conversion failed for {file.Name} - no result found");
+                            }
                         }
-                         _progressViewModel.UpdateProgress("All processing complete.", finalPercentage);
+                        
+                        if (conversionResult.FailedFiles.Any())
+                        {
+                            _progressViewModel.AddLog($"WARNING: {conversionResult.FailedFiles.Count} files failed to convert");
+                            FileLogger.LogError($"Conversion completed with {conversionResult.FailedFiles.Count} failures");
+                        }
+                        
+                        _progressViewModel.UpdateProgress("All processing complete.", finalPercentage);
                     }
                     else
                     {

@@ -1,0 +1,220 @@
+<Window x:Class="RvtToNavisConverter.Views.SelectionSummaryView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:helpers="clr-namespace:RvtToNavisConverter.Helpers"
+        mc:Ignorable="d"
+        Title="Selection Summary" 
+        Height="600" 
+        Width="800"
+        WindowStartupLocation="CenterOwner"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        Background="{DynamicResource MaterialDesignPaper}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="Auto"
+        FontFamily="{DynamicResource MaterialDesignFont}">
+    <Window.Resources>
+        <helpers:BoolToSourceConverter x:Key="BoolToSourceConverter"/>
+    </Window.Resources>
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" 
+                   Text="Current Selection Summary" 
+                   Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                   Margin="0,0,0,16"/>
+
+        <!-- Summary Stats -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Download Stats -->
+            <materialDesign:Card Grid.Column="0" Padding="16" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="Files to Download" 
+                               Style="{StaticResource MaterialDesignSubtitle2TextBlock}"/>
+                    <TextBlock Text="{Binding DownloadCount}" 
+                               Style="{StaticResource MaterialDesignHeadline4TextBlock}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"
+                               Foreground="{StaticResource PrimaryHueMidBrush}"/>
+                    <TextBlock Text="{Binding DownloadSizeText}" 
+                               HorizontalAlignment="Center"
+                               FontSize="10"
+                               Opacity="0.7"/>
+                </StackPanel>
+            </materialDesign:Card>
+
+            <!-- Convert Stats -->
+            <materialDesign:Card Grid.Column="1" Padding="16" Margin="8,0">
+                <StackPanel>
+                    <TextBlock Text="Files to Convert" 
+                               Style="{StaticResource MaterialDesignSubtitle2TextBlock}"/>
+                    <TextBlock Text="{Binding ConvertCount}" 
+                               Style="{StaticResource MaterialDesignHeadline4TextBlock}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"
+                               Foreground="{StaticResource SecondaryHueMidBrush}"/>
+                    <TextBlock Text="{Binding ConvertSizeText}" 
+                               HorizontalAlignment="Center"
+                               FontSize="10"
+                               Opacity="0.7"/>
+                </StackPanel>
+            </materialDesign:Card>
+
+            <!-- Total Stats -->
+            <materialDesign:Card Grid.Column="2" Padding="16" Margin="8,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="Total Selected" 
+                               Style="{StaticResource MaterialDesignSubtitle2TextBlock}"/>
+                    <TextBlock Text="{Binding TotalCount}" 
+                               Style="{StaticResource MaterialDesignHeadline4TextBlock}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Text="{Binding TotalSizeText}" 
+                               HorizontalAlignment="Center"
+                               FontSize="10"
+                               Opacity="0.7"/>
+                </StackPanel>
+            </materialDesign:Card>
+        </Grid>
+
+        <!-- Tab Control for Lists -->
+        <TabControl Grid.Row="2" materialDesign:ColorZoneAssist.Mode="PrimaryMid">
+            <!-- Download Tab -->
+            <TabItem Header="Download List">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Grid.Row="0" 
+                               Text="Files selected for download from Revit Server"
+                               Opacity="0.7"
+                               Margin="8,8,8,4"/>
+                    
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding DownloadFiles}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              GridLinesVisibility="Horizontal"
+                              HeadersVisibility="Column">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="File Name" 
+                                                Binding="{Binding Name}" 
+                                                Width="*"/>
+                            <DataGridTextColumn Header="Path" 
+                                                Binding="{Binding Path}" 
+                                                Width="2*"/>
+                            <DataGridTextColumn Header="Revit Version" 
+                                                Binding="{Binding RevitVersion}" 
+                                                Width="100"/>
+                            <DataGridTemplateColumn Header="Remove" Width="60">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource MaterialDesignFlatButton}"
+                                                Height="24"
+                                                Width="24"
+                                                Padding="0"
+                                                Command="{Binding DataContext.RemoveDownloadCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
+                                            <materialDesign:PackIcon Kind="Close" Width="16" Height="16"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Convert Tab -->
+            <TabItem Header="Convert List">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Grid.Row="0" 
+                               Text="Files selected for conversion to Navisworks format"
+                               Opacity="0.7"
+                               Margin="8,8,8,4"/>
+                    
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding ConvertFiles}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              GridLinesVisibility="Horizontal"
+                              HeadersVisibility="Column">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="File Name" 
+                                                Binding="{Binding Name}" 
+                                                Width="*"/>
+                            <DataGridTextColumn Header="Path" 
+                                                Binding="{Binding Path}" 
+                                                Width="2*"/>
+                            <DataGridTextColumn Header="Source" 
+                                                Width="80"
+                                                Binding="{Binding IsLocal, Converter={StaticResource BoolToSourceConverter}}"/>
+                            <DataGridTextColumn Header="Revit Version" 
+                                                Binding="{Binding RevitVersion}" 
+                                                Width="100"/>
+                            <DataGridTemplateColumn Header="Remove" Width="60">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource MaterialDesignFlatButton}"
+                                                Height="24"
+                                                Width="24"
+                                                Padding="0"
+                                                Command="{Binding DataContext.RemoveConvertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
+                                            <materialDesign:PackIcon Kind="Close" Width="16" Height="16"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="3" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+            <Button Content="REFRESH" 
+                    Command="{Binding RefreshCommand}"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Margin="0,0,8,0"/>
+            <Button Content="CLEAR ALL" 
+                    Command="{Binding ClearAllCommand}"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Margin="0,0,8,0"/>
+            <Button Content="CLOSE" 
+                    IsCancel="True"
+                    Style="{StaticResource MaterialDesignFlatButton}"/>
+        </StackPanel>
+    </Grid>
+</Window>

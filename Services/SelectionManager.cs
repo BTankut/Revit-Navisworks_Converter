@@ -339,6 +339,15 @@ namespace RvtToNavisConverter.Services
             return new Dictionary<string, SelectionState>(_selectionStates, StringComparer.OrdinalIgnoreCase);
         }
 
+        public SelectionState? GetSelectionState(string path)
+        {
+            if (_selectionStates.TryGetValue(path, out var state))
+            {
+                return state;
+            }
+            return null;
+        }
+
         public void RestoreSelections(Dictionary<string, SelectionState> selections)
         {
             if (selections == null) return;

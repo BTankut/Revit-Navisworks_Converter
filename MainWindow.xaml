@@ -44,6 +44,12 @@
             <Separator/>
             <Button x:Name="StartProcessingButton" Command="{Binding StartProcessingCommand}" Content="Start Processing" Background="DodgerBlue" Click="StartProcessingButton_Click" ToolTip="Process selected files"/>
             <Separator/>
+            <Button Command="{Binding OpenSelectionSummaryCommand}" ToolTip="View Selection Summary">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="FormatListChecks" Margin="0,0,5,0"/>
+                    <TextBlock Text="Summary"/>
+                </StackPanel>
+            </Button>
             <Button Command="{Binding OpenSettingsCommand}" Content="Settings"/>
             <Button Command="{Binding OpenMonitorCommand}" ToolTip="Open PowerShell Monitor">
                 <materialDesign:PackIcon Kind="Monitor" />
