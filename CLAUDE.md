@@ -162,15 +162,14 @@ dotnet build --configuration Release
 - `@modelcontextprotocol/server-github` - GitHub server for MCP
 
 ### Version History Pattern
-- **v2.5.0**: Enhanced handling for complex Revit files (parking models)
-  - Added ConversionResult class to track success/failure per file
-  - Parse conversion.log to identify files that failed with "Load was canceled" error
-  - Update UI to show accurate "Conversion Failed" status for individual files
-  - Increased timeout from 10 to 20 minutes for batch conversion
-  - Added `/osd` flag for individual retry attempts to force full document load
-  - Implemented special retry logic for parking models with 30-minute timeout
-  - Added `/version 2021` compatibility flag for failed parking models
-  - Three-tier retry strategy: batch → individual → minimal conversion
+- **v2.4.1**: Fixed Selection Summary folder handling and automatic updates
+  - Converted RefreshSelections to async method (RefreshSelectionsAsync)
+  - Added automatic folder content loading when folder markers are found
+  - Processing folders without markers to load their contents
+  - Filtering to only show .rvt files in the lists
+  - Updated all callers to use Task.Run for async execution
+  - Ensuring selection changes trigger automatic refresh
+  - Properly handling async operations for folder content loading
 - **v2.4.0**: Fixed critical bug with failed downloads being sent to conversion
   - Fixed issue where files that failed to download were still being processed for conversion
   - Added file existence validation before conversion to prevent errors

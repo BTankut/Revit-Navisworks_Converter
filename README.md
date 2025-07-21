@@ -2,7 +2,7 @@
 
 A WPF desktop application for downloading Revit files from Revit Server and converting them to Navisworks formats (.nwd/.nwc).
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.4.1-blue.svg)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-purple.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -15,13 +15,18 @@ A WPF desktop application for downloading Revit files from Revit Server and conv
 - **Format Support**: Convert to both .nwd and .nwc Navisworks formats
 - **Progress Tracking**: Real-time progress monitoring with detailed status updates
 
-### Advanced Features (v2.1.0)
+### Advanced Features
 - **Automatic Tool Detection**: Scans for installed Revit/Navisworks versions
 - **Version Compatibility**: Detects Revit file versions and validates tool compatibility
 - **Hierarchical Selection**: Smart folder selection with parent/child relationships
 - **Permission Validation**: Startup checks for required file system permissions
 - **PowerShell Logging**: Comprehensive logging of all external tool executions
 - **Windows Server Support**: Fully tested on Windows Server 2019
+- **Selection Summary**: Real-time view of selected files for download/conversion
+  - Interactive lists with row numbers
+  - Automatic updates when selections change
+  - Separate tabs for download and convert lists
+  - File counts and estimated sizes
 - **Licensing System**: RSA-based license protection with Hardware ID
   - Trial licenses with customizable duration
   - Full licenses for permanent use
@@ -179,6 +184,10 @@ Application logs are stored at:
 
 ## Version History
 
+- **v2.4.1** - Fixed Selection Summary folder handling and automatic updates
+- **v2.4.0** - Fixed critical bug with failed downloads being sent to conversion
+- **v2.3.0** - Enhanced logging with timestamps and improved UI text alignment
+- **v2.2.0** - Fixed critical folder selection processing bugs
 - **v2.1.0** - RSA-based licensing system with Hardware ID protection
 - **v2.0.0** - Production-ready release with Windows Server 2019 support
 - **v1.8.0** - Added Revit file version detection and compatibility checking
