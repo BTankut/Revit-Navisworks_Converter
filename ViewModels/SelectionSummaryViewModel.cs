@@ -129,7 +129,7 @@ namespace RvtToNavisConverter.ViewModels
             RefreshSelections();
         }
 
-        private async void RefreshSelections()
+        public async void RefreshSelections()
         {
             try
             {
@@ -152,19 +152,12 @@ namespace RvtToNavisConverter.ViewModels
                     // Check if this is a file or folder
                     if (path.EndsWith("\\*"))
                     {
-                        // This is a folder marker - get all files recursively
-                        var folderPath = path.TrimEnd('\\', '*');
-                        var isLocal = !path.StartsWith("\\\\");
-                        
-                        var items = isLocal
-                            ? await _localFileService.GetDirectoryContentsAsync(folderPath, System.Threading.CancellationToken.None)
-                            : await _revitServerService.GetDirectoryContentsAsync(folderPath, System.Threading.CancellationToken.None);
-
-                        await ProcessItemsRecursive(items.ToList(), state, downloadFiles, convertFiles, isLocal);
+                        // This is a folder marker - skip it, we'll process files within folders
+                        continue;
                     }
-                    else
+                    else if (System.IO.File.Exists(path) || !System.IO.Directory.Exists(path))
                     {
-                        // This is a file
+                        // This is a file (or at least not a directory)
                         var fileName = System.IO.Path.GetFileName(path);
                         var isLocal = !path.StartsWith("\\\\");
                         

@@ -409,19 +409,47 @@ private void ToggleSelection(IFileSystemItem item, bool isDownload)
             }
         }
 
+        private SelectionSummaryView? _selectionSummaryWindow;
+        private SelectionSummaryViewModel? _selectionSummaryViewModel;
+
         private void OpenSelectionSummary()
         {
-            var summaryViewModel = new SelectionSummaryViewModel(
+            if (_selectionSummaryWindow != null && _selectionSummaryWindow.IsLoaded)
+            {
+                // Window is already open, bring it to front
+                _selectionSummaryWindow.Activate();
+                return;
+            }
+
+            _selectionSummaryViewModel = new SelectionSummaryViewModel(
                 _selectionManager,
                 _localFileService,
                 _revitServerService);
             
-            var summaryWindow = new SelectionSummaryView 
+            _selectionSummaryWindow = new SelectionSummaryView 
             { 
-                DataContext = summaryViewModel,
+                DataContext = _selectionSummaryViewModel,
                 Owner = Application.Current.MainWindow
             };
-            summaryWindow.ShowDialog();
+            
+            _selectionSummaryWindow.Closed += (s, e) => 
+            {
+                // Unsubscribe from selection changes
+                _selectionManager.SelectionChanged -= OnSelectionChangedForSummary;
+                _selectionSummaryWindow = null;
+                _selectionSummaryViewModel = null;
+            };
+            
+            // Subscribe to selection changes to update the summary window
+            _selectionManager.SelectionChanged += OnSelectionChangedForSummary;
+            
+            _selectionSummaryWindow.Show();
+        }
+
+        private void OnSelectionChangedForSummary(object? sender, SelectionChangedEventArgs e)
+        {
+            // Update summary window if it's open
+            _selectionSummaryViewModel?.RefreshSelections();
         }
 
         private void OpenAbout()
