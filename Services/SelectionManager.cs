@@ -326,6 +326,12 @@ namespace RvtToNavisConverter.Services
             if (string.IsNullOrEmpty(folderPath)) return;
             _folderContents[folderPath] = contents;
         }
+        
+        public List<string>? GetFolderContents(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath)) return null;
+            return _folderContents.TryGetValue(folderPath, out var contents) ? contents : null;
+        }
 
         public void ClearAllSelections()
         {

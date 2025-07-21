@@ -140,6 +140,52 @@ namespace RvtToNavisConverter.ViewModels
                 var selections = _selectionManager.GetAllSelections();
                 FileLogger.Log($"SelectionSummary: Found {selections.Count} total selections");
 
+                // First, process folder markers to get all files
+                var folderMarkers = selections.Where(kvp => kvp.Key.EndsWith("\\*") && 
+                    (kvp.Value.IsSelectedForDownload == true || kvp.Value.IsSelectedForConversion == true))
+                    .ToList();
+                
+                foreach (var marker in folderMarkers)
+                {
+                    var folderPath = marker.Key.Substring(0, marker.Key.Length - 2); // Remove \*
+                    var isLocal = !folderPath.StartsWith("\\\\");
+                    
+                    FileLogger.Log($"Processing folder marker: {marker.Key}, folder: {folderPath}");
+                    
+                    // Get all files from the folder contents stored in SelectionManager
+                    var folderContents = _selectionManager.GetFolderContents(folderPath);
+                    if (folderContents != null)
+                    {
+                        foreach (var filePath in folderContents.Where(p => !p.EndsWith("\\*")))
+                        {
+                            // Check if this specific file has been deselected
+                            var fileState = _selectionManager.GetSelectionState(filePath);
+                            
+                            // Use file's specific state if it exists, otherwise use folder's state
+                            var shouldDownload = fileState?.IsSelectedForDownload ?? marker.Value.IsSelectedForDownload;
+                            var shouldConvert = fileState?.IsSelectedForConversion ?? marker.Value.IsSelectedForConversion;
+                            
+                            if (shouldDownload == true || shouldConvert == true)
+                            {
+                                var fileName = System.IO.Path.GetFileName(filePath);
+                                var fileItem = new FileItem
+                                {
+                                    Name = fileName,
+                                    Path = filePath,
+                                    IsLocal = isLocal
+                                };
+                                
+                                if (shouldDownload == true && !isLocal)
+                                    downloadFiles.Add(fileItem);
+                                    
+                                if (shouldConvert == true)
+                                    convertFiles.Add(fileItem);
+                            }
+                        }
+                    }
+                }
+                
+                // Then process individual file selections that aren't part of folders
                 foreach (var kvp in selections)
                 {
                     var path = kvp.Key;
@@ -149,15 +195,19 @@ namespace RvtToNavisConverter.ViewModels
                     if (state.IsSelectedForDownload != true && state.IsSelectedForConversion != true)
                         continue;
 
-                    // Check if this is a file or folder
+                    // Skip folder markers (already processed above)
                     if (path.EndsWith("\\*"))
-                    {
-                        // This is a folder marker - skip it, we'll process files within folders
                         continue;
-                    }
-                    else if (System.IO.File.Exists(path) || !System.IO.Directory.Exists(path))
+                    
+                    // Check if this file is already included from a folder
+                    var alreadyIncluded = downloadFiles.Any(f => f.Path == path) || 
+                                        convertFiles.Any(f => f.Path == path);
+                    if (alreadyIncluded)
+                        continue;
+                    
+                    // This is an individual file selection
+                    if (System.IO.File.Exists(path) || !System.IO.Directory.Exists(path))
                     {
-                        // This is a file (or at least not a directory)
                         var fileName = System.IO.Path.GetFileName(path);
                         var isLocal = !path.StartsWith("\\\\");
                         
